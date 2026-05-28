@@ -223,6 +223,7 @@ let STATE = {
   tab:"dashboard",
   workoutHistory:[],
   nutritionLog:{},
+  customFoods:[],
   activeWorkout:null,
   workoutRunning:false,
   elapsed:0,
@@ -264,14 +265,16 @@ function elapsedFromTS(){ const ts=loadTS(); return ts?Math.floor((Date.now()-ts
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
   try{
-    const [wSnap,nSnap] = await Promise.all([
+    const [wSnap,nSnap,cfSnap] = await Promise.all([
       _db.collection("workouts").orderBy("date","desc").get(),
-      _db.collection("nutrition_logs").get()
+      _db.collection("nutrition_logs").get(),
+      _db.collection("custom_foods").get()
     ]);
     STATE.workoutHistory = wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}));
     const log={};
     nSnap.docs.forEach(d=>{ log[d.id]=d.data().meals||{}; });
     STATE.nutritionLog = log;
+    STATE.customFoods = cfSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.loading = false;
     const savedAW = loadAW();
     if(savedAW){
@@ -300,6 +303,16 @@ async function saveNutritionDB(date,meals){
   catch(e){ console.error("nutrition error:",e); }
 }
 
+async function saveCustomFoodDB(food){
+  try{
+    const ref = await _db.collection("custom_foods").add(food);
+    const newFood = {__id:ref.id,...food};
+    STATE.customFoods = [...STATE.customFoods, newFood];
+    showToast("✓ Besin kaydedildi!");
+    return newFood;
+  }catch(e){ console.error("custom food error:",e); showToast("⚠️ Kaydetme hatası!"); return null; }
+}
+
 async function deleteWorkout(id){
   if(!confirm("Bu antrenmanı silmek istediğine emin misin?")) return;
   STATE.workoutHistory = STATE.workoutHistory.filter(w=>w.__id!==id);
@@ -322,7 +335,12 @@ function todayStr(){
 function fmtDate(s){ return new Date(s+"T12:00:00").toLocaleDateString("tr-TR",{month:"short",day:"numeric"}); }
 function fmtDur(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 function calcN(id,g){
-  const f=FOOD_DB.find(x=>x.id===id); if(!f) return{kcal:0,protein:0,carb:0,fat:0};
+  let f = FOOD_DB.find(x=>x.id===id);
+  if(!f){
+    const cf = STATE.customFoods.find(x=>x.__id===id);
+    if(cf) f = {p:{kcal:cf.kcal,protein:cf.protein,carb:cf.carb,fat:cf.fat}};
+  }
+  if(!f) return{kcal:0,protein:0,carb:0,fat:0};
   const r=g/100;
   return{kcal:Math.round(f.p.kcal*r),protein:Math.round(f.p.protein*r*10)/10,carb:Math.round(f.p.carb*r*10)/10,fat:Math.round(f.p.fat*r*10)/10};
 }
@@ -735,9 +753,10 @@ function renderDrawer(){
     </div>`;
   }
   if(d.type==="foodPicker"){
-    const{mealType,q="",cat="Hepsi",pending,grams="100"}=d;
-    const cats=["Hepsi",...new Set(FOOD_DB.map(f=>f.cat))];
-    const filtered=FOOD_DB.filter(f=>(cat==="Hepsi"||f.cat===cat)&&f.name.toLowerCase().includes(q.toLowerCase()));
+    const{mealType,q="",cat="Hepsi",pending,grams="100",pickerTab="db",cf_name="",cf_kcal="",cf_protein="",cf_carb="",cf_fat="",cf_cat="Özel"}=d;
+    const allFoods=[...FOOD_DB,...STATE.customFoods.map(f=>({id:f.__id,name:f.name,cat:f.cat||"Özel",p:{kcal:f.kcal,protein:f.protein,carb:f.carb,fat:f.fat}}))];    
+    const cats=["Hepsi",...new Set(allFoods.map(f=>f.cat))];
+    const filtered=allFoods.filter(f=>(cat==="Hepsi"||f.cat===cat)&&f.name.toLowerCase().includes(q.toLowerCase()));
     if(pending){
       const n=calcN(pending.id,parseFloat(grams)||0);
       return`<div class="drawer">
@@ -773,9 +792,14 @@ function renderDrawer(){
         <h3 style="font-size:16px;font-weight:800;text-transform:uppercase">${mealType} — Yemek Ekle</h3>
         <button onclick="closeDrawer()" style="background:none;border:none;color:#7A8898;font-size:22px">✕</button>
       </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button onclick="setDD({pickerTab:'db'})" style="flex:1;background:${pickerTab==='db'?'#00BFFF':'#1A2530'};border:none;border-radius:8px;color:${pickerTab==='db'?'#000':'#E8ECF0'};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Besin Ara</button>
+        <button onclick="setDD({pickerTab:'custom'})" style="flex:1;background:${pickerTab==='custom'?'#00BFFF':'#1A2530'};border:none;border-radius:8px;color:${pickerTab==='custom'?'#000':'#E8ECF0'};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">+ Özel Besin</button>
+      </div>
+      ${pickerTab==='db'?`
       <input id="drawer-search" class="fi" placeholder="🔍 Besin ara..." value="${q}" oninput="updateSearch(this.value)" style="margin-bottom:8px"/>
       <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px">
-        ${cats.map(c=>`<button onclick="setDD({cat:'${c}'})" style="flex-shrink:0;background:${cat===c?"#00BFFF":"#1A2530"};border:none;border-radius:6px;color:${cat===c?"#000":"#A0B0C0"};font-size:10px;font-weight:700;padding:5px 10px;white-space:nowrap;text-transform:uppercase">${c}</button>`).join("")}
+        ${cats.map(c=>`<button onclick="setDD({cat:'${c}'})" style="flex-shrink:0;background:${cat===c?'#00BFFF':'#1A2530'};border:none;border-radius:6px;color:${cat===c?'#000':'#A0B0C0'};font-size:10px;font-weight:700;padding:5px 10px;white-space:nowrap;text-transform:uppercase">${c}</button>`).join("")}
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
         ${filtered.slice(0,40).map(food=>`
@@ -783,8 +807,32 @@ function renderDrawer(){
             <div style="text-align:left"><div style="font-size:13px;font-weight:700">${food.name}</div><div style="font-size:10px;color:#7A8898">${food.cat}</div></div>
             <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#00BFFF">${food.p.kcal} kcal</div><div style="font-size:10px;color:#7A8898">P:${food.p.protein}g</div></div>
           </button>`).join("")}
-        ${filtered.length>40?`<div style="color:#556070;font-size:11px;text-align:center;padding:8px">+ ${filtered.length-40} daha — aramayı daralt</div>`:""}
-      </div>
+        ${filtered.length>40?`<div style="color:#556070;font-size:11px;text-align:center;padding:8px">+ ${filtered.length-40} daha</div>`:""}
+      </div>`:`
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Besin Adı *</div>
+          <input id="cf-name" class="fi" placeholder="örn. Ev Yapımı Köfte" value="${cf_name}" oninput="updateDrawerField('cf_name',this.value)"/></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#00BFFF;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kalori (kcal)</div>
+            <input id="cf-kcal" class="fi" type="number" placeholder="0" value="${cf_kcal}" oninput="updateDrawerField('cf_kcal',this.value)"/></div>
+          <div><div style="font-size:10px;color:#FF6B6B;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Protein (g)</div>
+            <input id="cf-protein" class="fi" type="number" placeholder="0" value="${cf_protein}" oninput="updateDrawerField('cf_protein',this.value)"/></div>
+          <div><div style="font-size:10px;color:#BB86FC;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Karbonhidrat (g)</div>
+            <input id="cf-carb" class="fi" type="number" placeholder="0" value="${cf_carb}" oninput="updateDrawerField('cf_carb',this.value)"/></div>
+          <div><div style="font-size:10px;color:#FFD700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Yağ (g)</div>
+            <input id="cf-fat" class="fi" type="number" placeholder="0" value="${cf_fat}" oninput="updateDrawerField('cf_fat',this.value)"/></div>
+        </div>
+        <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:8px;padding:8px 12px;font-size:11px;color:#7A8898">
+          📌 Değerler <strong style="color:#E8ECF0">100g başına</strong> girilmeli. Sonra gramaj belirtirsin.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Gramaj (g)</div>
+            <input id="cf-grams" class="fi" type="number" placeholder="100" value="${grams}" oninput="updateDrawerField('grams',this.value)"/></div>
+          <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kategori</div>
+            <input id="cf-cat" class="fi" placeholder="Özel" value="${cf_cat}" oninput="updateDrawerField('cf_cat',this.value)"/></div>
+        </div>
+        <button onclick="addCustomFood('${mealType}')" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:15px;font-weight:900;padding:12px;text-transform:uppercase;letter-spacing:1px">Kaydet ve Ekle ✓</button>
+      </div>`}
     </div>`;
   }
   return "";
@@ -874,7 +922,36 @@ function discardWorkout(){
 }
 
 function openFoodPicker(mealType){ STATE.drawer={type:"foodPicker",mealType,q:"",cat:"Hepsi",pending:null,grams:"100"}; render(); }
-function selectFood(foodId){ const food=FOOD_DB.find(f=>f.id===foodId); if(!food) return; STATE.drawer={...STATE.drawer,pending:food,grams:"100"}; renderDrawerOnly(); }
+function selectFood(foodId){
+  let food = FOOD_DB.find(f=>f.id===foodId);
+  if(!food){
+    const cf = STATE.customFoods.find(f=>f.__id===foodId);
+    if(cf) food = {id:cf.__id, name:cf.name, cat:cf.cat||"Özel", p:{kcal:cf.kcal,protein:cf.protein,carb:cf.carb,fat:cf.fat}};
+  }
+  if(!food) return;
+  STATE.drawer={...STATE.drawer,pending:food,grams:"100"}; renderDrawerOnly();
+}
+
+async function addCustomFood(mealType){
+  const d = STATE.drawer;
+  if(!d || !d.cf_name?.trim()) { showToast("⚠️ Besin adı gerekli!"); return; }
+  const food = {
+    name: d.cf_name.trim(),
+    cat: d.cf_cat || "Özel",
+    kcal: parseFloat(d.cf_kcal)||0,
+    protein: parseFloat(d.cf_protein)||0,
+    carb: parseFloat(d.cf_carb)||0,
+    fat: parseFloat(d.cf_fat)||0,
+  };
+  const saved = await saveCustomFoodDB(food);
+  if(!saved) return;
+  const date = todayStr();
+  const emptyM = {"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
+  const dayM = STATE.nutritionLog[date] || emptyM;
+  const updated = {...dayM,[mealType]:[...(dayM[mealType]||[]),{id:saved.__id, g:parseFloat(d.grams)||100}]};
+  STATE.drawer = null;
+  await saveNutritionDB(date, updated);
+}
 
 async function confirmFood(){
   const d=STATE.drawer; if(!d||!d.pending) return;

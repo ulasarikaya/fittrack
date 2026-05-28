@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="FitTrack"/>
+<meta name="theme-color" content="#080B10"/>
+<title>FitTrack Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080B10;color:#E8ECF0;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;-webkit-font-smoothing:antialiased}
+#root{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#00BFFF44;border-radius:2px}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input,select,button{font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif}
+button{cursor:pointer}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.glow{text-shadow:0 0 12px #00BFFF88}
+.tab-line{position:absolute;top:0;left:15%;right:15%;height:2px;background:#00BFFF;border-radius:0 0 2px 2px}
+.sr-input{background:#1A1F28;border:1px solid #2A3040;color:#E8ECF0;border-radius:4px;padding:6px 4px;text-align:center;font-size:15px;font-weight:700;width:100%;outline:none}
+.sr-input:focus{border-color:#00BFFF}
+.sr-done .sr-input{background:#0A2010;border-color:#39FF1440;color:#39FF14}
+.fi{background:#1A1F28;border:1px solid #2A3040;color:#E8ECF0;border-radius:6px;padding:9px 11px;font-size:14px;font-weight:600;outline:none;width:100%}
+.fi:focus{border-color:#00BFFF}
+.drawer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border:1px solid #1E2530;border-radius:14px 14px 0 0;padding:14px;z-index:300;max-height:78vh;overflow-y:auto}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1A2530;border:1px solid #00BFFF40;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;color:#00BFFF;z-index:999;animation:toastIn .3s ease;white-space:nowrap}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+<!-- Firebase Compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><div style="font-size:36px" class="pulse">⚡</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase">Yükleniyor...</div></div></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORKOUT PLAN
+// ═══════════════════════════════════════════════════════════════════════════════
+const WORKOUT_PLAN = {
+  "Day 1: Push":{color:"#00BFFF",muscles:["Chest","Shoulders","Triceps"],exercises:[
+    {id:"chest_press",name:"Machine Chest Press",muscle:"Chest",ds:4,dr:10},
+    {id:"incline_press",name:"Incline Machine Press",muscle:"Chest",ds:3,dr:12},
+    {id:"pec_deck",name:"Pec Deck Fly",muscle:"Chest",ds:3,dr:15},
+    {id:"shoulder_press",name:"Machine Shoulder Press",muscle:"Shoulders",ds:4,dr:10},
+    {id:"lateral_raise",name:"Cable Lateral Raise",muscle:"Shoulders",ds:3,dr:15},
+    {id:"tricep_pushdown",name:"Triceps Pushdown",muscle:"Triceps",ds:3,dr:12},
+    {id:"overhead_ext",name:"Overhead Triceps Extension",muscle:"Triceps",ds:3,dr:12},
+  ]},
+  "Day 2: Pull":{color:"#FF6B35",muscles:["Back","Biceps","Rear Delts"],exercises:[
+    {id:"lat_pulldown",name:"Lat Pulldown",muscle:"Back",ds:4,dr:10},
+    {id:"seated_row",name:"Seated Cable Row",muscle:"Back",ds:4,dr:10},
+    {id:"chest_row",name:"Chest-Supported Row",muscle:"Back",ds:3,dr:12},
+    {id:"face_pull",name:"Face Pull",muscle:"Rear Delts",ds:3,dr:15},
+    {id:"rear_fly",name:"Rear Delt Fly Machine",muscle:"Rear Delts",ds:3,dr:15},
+    {id:"bicep_curl",name:"Machine Bicep Curl",muscle:"Biceps",ds:3,dr:12},
+    {id:"hammer_curl",name:"Dumbbell Hammer Curl",muscle:"Biceps",ds:3,dr:12},
+  ]},
+  "Day 3: Legs":{color:"#39FF14",muscles:["Quads","Hamstrings","Glutes","Calves"],exercises:[
+    {id:"leg_press",name:"Leg Press",muscle:"Quads",ds:4,dr:12},
+    {id:"hack_squat",name:"Hack Squat Machine",muscle:"Quads",ds:4,dr:10},
+    {id:"leg_ext",name:"Leg Extension",muscle:"Quads",ds:3,dr:15},
+    {id:"leg_curl",name:"Lying Leg Curl",muscle:"Hamstrings",ds:4,dr:12},
+    {id:"hip_thrust",name:"Machine Hip Thrust",muscle:"Glutes",ds:4,dr:12},
+    {id:"calf_raise",name:"Standing Calf Raise",muscle:"Calves",ds:4,dr:15},
+  ]}
+};
+const ALL_EX = Object.values(WORKOUT_PLAN).flatMap(d=>d.exercises);
+const MC = {Chest:"#00BFFF",Shoulders:"#4FC3F7",Triceps:"#0288D1",Back:"#FF6B35",Biceps:"#FF8A65","Rear Delts":"#FF5722",Quads:"#39FF14",Hamstrings:"#69FF47",Glutes:"#00E676",Calves:"#76FF03",Core:"#FFD700",Custom:"#BB86FC"};
+const TARGETS = {kcal:2100,protein:180,carb:180,fat:65};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FOOD DATABASE
+// ═══════════════════════════════════════════════════════════════════════════════
+const FOOD_DB=[
+  {id:"f001",name:"Tavuk Göğsü (Pişmiş)",cat:"Et/Tavuk/Balık",p:{kcal:165,protein:31,carb:0,fat:3.6}},
+  {id:"f002",name:"Tavuk Göğsü (Çiğ)",cat:"Et/Tavuk/Balık",p:{kcal:120,protein:22,carb:0,fat:2.6}},
+  {id:"f003",name:"Tavuk But (Derili)",cat:"Et/Tavuk/Balık",p:{kcal:245,protein:24,carb:0,fat:16}},
+  {id:"f004",name:"Tavuk But (Derisiz)",cat:"Et/Tavuk/Balık",p:{kcal:185,protein:27,carb:0,fat:8}},
+  {id:"f005",name:"Tavuk Kıyma",cat:"Et/Tavuk/Balık",p:{kcal:143,protein:17,carb:0,fat:8}},
+  {id:"f006",name:"Dana Antrikot",cat:"Et/Tavuk/Balık",p:{kcal:271,protein:26,carb:0,fat:18}},
+  {id:"f007",name:"Dana Kıyma (%10 yağ)",cat:"Et/Tavuk/Balık",p:{kcal:215,protein:26,carb:0,fat:12}},
+  {id:"f008",name:"Dana Kıyma (%20 yağ)",cat:"Et/Tavuk/Balık",p:{kcal:254,protein:24,carb:0,fat:17}},
+  {id:"f009",name:"Dana Biftek (Izgara)",cat:"Et/Tavuk/Balık",p:{kcal:217,protein:28,carb:0,fat:11}},
+  {id:"f010",name:"Kuzu Pirzola",cat:"Et/Tavuk/Balık",p:{kcal:294,protein:24,carb:0,fat:21}},
+  {id:"f011",name:"Hindi Göğsü",cat:"Et/Tavuk/Balık",p:{kcal:135,protein:30,carb:0,fat:1}},
+  {id:"f012",name:"Ton Balığı (Suda)",cat:"Et/Tavuk/Balık",p:{kcal:116,protein:26,carb:0,fat:1}},
+  {id:"f013",name:"Ton Balığı (Yağlı)",cat:"Et/Tavuk/Balık",p:{kcal:198,protein:25,carb:0,fat:10}},
+  {id:"f014",name:"Somon (Pişmiş)",cat:"Et/Tavuk/Balık",p:{kcal:208,protein:20,carb:0,fat:13}},
+  {id:"f015",name:"Hamsi",cat:"Et/Tavuk/Balık",p:{kcal:131,protein:20,carb:0,fat:5}},
+  {id:"f016",name:"Çipura (Izgara)",cat:"Et/Tavuk/Balık",p:{kcal:128,protein:26,carb:0,fat:2.4}},
+  {id:"f017",name:"Levrek",cat:"Et/Tavuk/Balık",p:{kcal:124,protein:23,carb:0,fat:3}},
+  {id:"f018",name:"Karidesler",cat:"Et/Tavuk/Balık",p:{kcal:99,protein:24,carb:0,fat:0.3}},
+  {id:"f019",name:"Sardalya (Konserve)",cat:"Et/Tavuk/Balık",p:{kcal:208,protein:25,carb:0,fat:11}},
+  {id:"f020",name:"Sucuk",cat:"Et/Tavuk/Balık",p:{kcal:385,protein:16,carb:2,fat:34}},
+  {id:"f021",name:"Pastırma",cat:"Et/Tavuk/Balık",p:{kcal:196,protein:30,carb:0,fat:8}},
+  {id:"f022",name:"Jambon (Hindi)",cat:"Et/Tavuk/Balık",p:{kcal:105,protein:17,carb:1,fat:3.5}},
+  {id:"f023",name:"Yumurta (Bütün)",cat:"Süt/Yumurta",p:{kcal:155,protein:13,carb:1.1,fat:11}},
+  {id:"f024",name:"Yumurta Akı",cat:"Süt/Yumurta",p:{kcal:52,protein:11,carb:0.7,fat:0.2}},
+  {id:"f025",name:"Süt (%1.5)",cat:"Süt/Yumurta",p:{kcal:47,protein:3.4,carb:5,fat:1.5}},
+  {id:"f026",name:"Süt (Tam Yağlı)",cat:"Süt/Yumurta",p:{kcal:61,protein:3.2,carb:4.8,fat:3.5}},
+  {id:"f027",name:"Süzme Yoğurt (%0)",cat:"Süt/Yumurta",p:{kcal:59,protein:10,carb:3.6,fat:0.4}},
+  {id:"f028",name:"Süzme Yoğurt (%2)",cat:"Süt/Yumurta",p:{kcal:73,protein:9,carb:4,fat:2}},
+  {id:"f029",name:"Yoğurt (Tam Yağlı)",cat:"Süt/Yumurta",p:{kcal:97,protein:5.7,carb:7,fat:5}},
+  {id:"f030",name:"Ayran",cat:"Süt/Yumurta",p:{kcal:36,protein:1.9,carb:2.9,fat:1.6}},
+  {id:"f031",name:"Kefir",cat:"Süt/Yumurta",p:{kcal:61,protein:3.4,carb:4.5,fat:3.3}},
+  {id:"f032",name:"Lor Peyniri",cat:"Süt/Yumurta",p:{kcal:90,protein:12.5,carb:3.4,fat:3}},
+  {id:"f033",name:"Beyaz Peynir (Tam Yağlı)",cat:"Süt/Yumurta",p:{kcal:264,protein:17,carb:1,fat:21}},
+  {id:"f034",name:"Beyaz Peynir (Light)",cat:"Süt/Yumurta",p:{kcal:160,protein:18,carb:1,fat:9}},
+  {id:"f035",name:"Kaşar Peyniri",cat:"Süt/Yumurta",p:{kcal:350,protein:25,carb:1.3,fat:27}},
+  {id:"f036",name:"Kaşar (Light)",cat:"Süt/Yumurta",p:{kcal:240,protein:27,carb:1,fat:14}},
+  {id:"f037",name:"Çökelek",cat:"Süt/Yumurta",p:{kcal:70,protein:11,carb:2,fat:1.8}},
+  {id:"f038",name:"Labne",cat:"Süt/Yumurta",p:{kcal:130,protein:8,carb:3,fat:9}},
+  {id:"f039",name:"Yulaf Ezmesi",cat:"Tahıl/Ekmek",p:{kcal:389,protein:17,carb:66,fat:7}},
+  {id:"f040",name:"Pirinç (Beyaz, Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:130,protein:2.7,carb:28,fat:0.3}},
+  {id:"f041",name:"Pirinç (Esmer, Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:112,protein:2.6,carb:23,fat:0.9}},
+  {id:"f042",name:"Makarna (Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:158,protein:5.8,carb:31,fat:0.9}},
+  {id:"f043",name:"Tam Buğday Makarnası",cat:"Tahıl/Ekmek",p:{kcal:149,protein:6.3,carb:28,fat:1.4}},
+  {id:"f044",name:"Tam Buğday Ekmeği",cat:"Tahıl/Ekmek",p:{kcal:247,protein:13,carb:41,fat:3.4}},
+  {id:"f045",name:"Beyaz Ekmek",cat:"Tahıl/Ekmek",p:{kcal:265,protein:9,carb:49,fat:3.2}},
+  {id:"f046",name:"Pide (Sade)",cat:"Tahıl/Ekmek",p:{kcal:270,protein:9,carb:53,fat:2.5}},
+  {id:"f047",name:"Bulgur (Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:83,protein:3.1,carb:18,fat:0.2}},
+  {id:"f048",name:"Kinoa (Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:120,protein:4.4,carb:21,fat:1.9}},
+  {id:"f049",name:"Mercimek (Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:116,protein:9,carb:20,fat:0.4}},
+  {id:"f050",name:"Nohut (Pişmiş)",cat:"Tahıl/Ekmek",p:{kcal:164,protein:8.9,carb:27,fat:2.6}},
+  {id:"f051",name:"Patates (Haşlanmış)",cat:"Tahıl/Ekmek",p:{kcal:87,protein:1.9,carb:20,fat:0.1}},
+  {id:"f052",name:"Simit",cat:"Tahıl/Ekmek",p:{kcal:299,protein:9,carb:57,fat:4}},
+  {id:"f053",name:"Brokoli",cat:"Sebze",p:{kcal:35,protein:2.4,carb:7,fat:0.4}},
+  {id:"f054",name:"Ispanak (Çiğ)",cat:"Sebze",p:{kcal:23,protein:2.9,carb:3.6,fat:0.4}},
+  {id:"f055",name:"Domates",cat:"Sebze",p:{kcal:18,protein:0.9,carb:3.9,fat:0.2}},
+  {id:"f056",name:"Salatalık",cat:"Sebze",p:{kcal:15,protein:0.7,carb:3.6,fat:0.1}},
+  {id:"f057",name:"Havuç",cat:"Sebze",p:{kcal:41,protein:0.9,carb:10,fat:0.2}},
+  {id:"f058",name:"Kabak",cat:"Sebze",p:{kcal:17,protein:1.2,carb:3.6,fat:0.2}},
+  {id:"f059",name:"Biber (Yeşil)",cat:"Sebze",p:{kcal:20,protein:0.9,carb:4.6,fat:0.2}},
+  {id:"f060",name:"Biber (Kırmızı)",cat:"Sebze",p:{kcal:31,protein:1,carb:6,fat:0.3}},
+  {id:"f061",name:"Mantar",cat:"Sebze",p:{kcal:28,protein:3.5,carb:5,fat:0.5}},
+  {id:"f062",name:"Patlıcan",cat:"Sebze",p:{kcal:35,protein:0.8,carb:8.7,fat:0.2}},
+  {id:"f063",name:"Marul",cat:"Sebze",p:{kcal:15,protein:1.4,carb:2.9,fat:0.2}},
+  {id:"f064",name:"Muz",cat:"Meyve",p:{kcal:89,protein:1.1,carb:23,fat:0.3}},
+  {id:"f065",name:"Elma",cat:"Meyve",p:{kcal:52,protein:0.3,carb:14,fat:0.2}},
+  {id:"f066",name:"Portakal",cat:"Meyve",p:{kcal:47,protein:0.9,carb:12,fat:0.1}},
+  {id:"f067",name:"Çilek",cat:"Meyve",p:{kcal:32,protein:0.7,carb:7.7,fat:0.3}},
+  {id:"f068",name:"Karpuz",cat:"Meyve",p:{kcal:30,protein:0.6,carb:7.6,fat:0.2}},
+  {id:"f069",name:"Avokado",cat:"Meyve",p:{kcal:160,protein:2,carb:9,fat:15}},
+  {id:"f070",name:"Hurma (Kuru)",cat:"Meyve",p:{kcal:277,protein:1.8,carb:75,fat:0.2}},
+  {id:"f071",name:"Badem",cat:"Kuruyemiş",p:{kcal:579,protein:21,carb:22,fat:50}},
+  {id:"f072",name:"Ceviz",cat:"Kuruyemiş",p:{kcal:654,protein:15,carb:14,fat:65}},
+  {id:"f073",name:"Fındık",cat:"Kuruyemiş",p:{kcal:628,protein:15,carb:17,fat:61}},
+  {id:"f074",name:"Kaju",cat:"Kuruyemiş",p:{kcal:553,protein:18,carb:30,fat:44}},
+  {id:"f075",name:"Yer Fıstığı",cat:"Kuruyemiş",p:{kcal:567,protein:26,carb:16,fat:49}},
+  {id:"f076",name:"Fıstık Ezmesi",cat:"Kuruyemiş",p:{kcal:588,protein:25,carb:20,fat:50}},
+  {id:"f077",name:"Zeytinyağı",cat:"Kuruyemiş",p:{kcal:884,protein:0,carb:0,fat:100}},
+  {id:"f078",name:"Chia Tohumu",cat:"Kuruyemiş",p:{kcal:486,protein:17,carb:42,fat:31}},
+  {id:"f079",name:"Mercimek Çorbası",cat:"Türk Mutfağı",p:{kcal:62,protein:4.2,carb:9,fat:1}},
+  {id:"f080",name:"Köfte (Izgara)",cat:"Türk Mutfağı",p:{kcal:220,protein:20,carb:5,fat:13}},
+  {id:"f081",name:"Döner (Tavuk)",cat:"Türk Mutfağı",p:{kcal:195,protein:22,carb:3,fat:11}},
+  {id:"f082",name:"Döner (Dana)",cat:"Türk Mutfağı",p:{kcal:240,protein:19,carb:2,fat:17}},
+  {id:"f083",name:"Menemen",cat:"Türk Mutfağı",p:{kcal:110,protein:8,carb:6,fat:5.5}},
+  {id:"f084",name:"Kuru Fasulye",cat:"Türk Mutfağı",p:{kcal:127,protein:8.7,carb:23,fat:0.5}},
+  {id:"f085",name:"Pilav (Tereyağlı)",cat:"Türk Mutfağı",p:{kcal:150,protein:2.7,carb:29,fat:2.5}},
+  {id:"f086",name:"Bulgur Pilavı",cat:"Türk Mutfağı",p:{kcal:92,protein:3.1,carb:19,fat:1.2}},
+  {id:"f087",name:"Cacık",cat:"Türk Mutfağı",p:{kcal:45,protein:3,carb:4,fat:1.5}},
+  {id:"f088",name:"Tavuk Şiş",cat:"Türk Mutfağı",p:{kcal:155,protein:28,carb:2,fat:3.5}},
+  {id:"f089",name:"Balık Izgara",cat:"Türk Mutfağı",p:{kcal:125,protein:24,carb:0,fat:2.5}},
+  {id:"f090",name:"Omlet (2 yumurta)",cat:"Türk Mutfağı",p:{kcal:150,protein:13,carb:1,fat:10}},
+  {id:"f091",name:"Çoban Salatası",cat:"Türk Mutfağı",p:{kcal:55,protein:1.5,carb:6,fat:2.8}},
+  {id:"f092",name:"Lahmacun",cat:"Fast Food",p:{kcal:190,protein:9,carb:28,fat:5}},
+  {id:"f093",name:"Hamburger",cat:"Fast Food",p:{kcal:295,protein:17,carb:24,fat:14}},
+  {id:"f094",name:"Pizza Dilimi",cat:"Fast Food",p:{kcal:266,protein:11,carb:33,fat:10}},
+  {id:"f095",name:"Patates Kızartması",cat:"Fast Food",p:{kcal:312,protein:3.4,carb:41,fat:15}},
+  {id:"f096",name:"Döner Dürüm",cat:"Fast Food",p:{kcal:280,protein:15,carb:30,fat:11}},
+  {id:"f097",name:"Tost",cat:"Fast Food",p:{kcal:260,protein:12,carb:30,fat:9}},
+  {id:"f098",name:"Börek (Ispanaklı)",cat:"Fast Food",p:{kcal:280,protein:9,carb:28,fat:15}},
+  {id:"f099",name:"Whey Protein",cat:"Takviye",p:{kcal:400,protein:80,carb:6,fat:5}},
+  {id:"f100",name:"Whey Isolate",cat:"Takviye",p:{kcal:370,protein:90,carb:2,fat:1}},
+  {id:"f101",name:"Kazein Proteini",cat:"Takviye",p:{kcal:380,protein:78,carb:8,fat:3}},
+  {id:"f102",name:"Protein Bar",cat:"Takviye",p:{kcal:350,protein:30,carb:35,fat:8}},
+  {id:"f103",name:"Kreatin",cat:"Takviye",p:{kcal:0,protein:0,carb:0,fat:0}},
+  {id:"f104",name:"Su",cat:"İçecek",p:{kcal:0,protein:0,carb:0,fat:0}},
+  {id:"f105",name:"Türk Kahvesi (Sade)",cat:"İçecek",p:{kcal:2,protein:0.3,carb:0,fat:0}},
+  {id:"f106",name:"Çay (Sade)",cat:"İçecek",p:{kcal:1,protein:0,carb:0.3,fat:0}},
+  {id:"f107",name:"Latte (200ml)",cat:"İçecek",p:{kcal:120,protein:6,carb:10,fat:5}},
+  {id:"f108",name:"Ayran (250ml)",cat:"İçecek",p:{kcal:36,protein:1.9,carb:2.9,fat:1.6}},
+  {id:"f109",name:"Cola (250ml)",cat:"İçecek",p:{kcal:105,protein:0,carb:28,fat:0}},
+  {id:"f110",name:"Bira (350ml)",cat:"İçecek",p:{kcal:154,protein:1.6,carb:13,fat:0}},
+  {id:"f111",name:"Şarap (150ml)",cat:"İçecek",p:{kcal:125,protein:0.1,carb:4,fat:0}},
+  {id:"f112",name:"Rakı (45ml)",cat:"İçecek",p:{kcal:105,protein:0,carb:0,fat:0}},
+  {id:"f113",name:"Tahin",cat:"Sos/Diğer",p:{kcal:595,protein:17,carb:21,fat:54}},
+  {id:"f114",name:"Bal",cat:"Sos/Diğer",p:{kcal:304,protein:0.3,carb:82,fat:0}},
+  {id:"f115",name:"Zeytinyağı (1 kaşık=14g)",cat:"Sos/Diğer",p:{kcal:884,protein:0,carb:0,fat:100}},
+];
+
+const MEAL_SUGG={
+  "Kahvaltı":[
+    {name:"Yüksek Proteinli",items:[{id:"f023",g:200},{id:"f032",g:100},{id:"f044",g:60},{id:"f055",g:100}]},
+    {name:"Yulaf + Yoğurt",items:[{id:"f039",g:80},{id:"f027",g:200},{id:"f064",g:100}]},
+    {name:"Omlet + Ekmek",items:[{id:"f090",g:150},{id:"f033",g:50},{id:"f044",g:60}]},
+  ],
+  "Ara Öğün":[
+    {name:"Protein Snack",items:[{id:"f027",g:200},{id:"f071",g:30}]},
+    {name:"Ton + Ekmek",items:[{id:"f012",g:150},{id:"f044",g:60}]},
+    {name:"Protein Shake",items:[{id:"f099",g:30},{id:"f025",g:300}]},
+  ],
+  "Akşam Yemeği":[
+    {name:"Tavuk + Pirinç",items:[{id:"f001",g:200},{id:"f040",g:150},{id:"f053",g:150},{id:"f077",g:10}]},
+    {name:"Balık + Bulgur",items:[{id:"f016",g:200},{id:"f086",g:200},{id:"f091",g:150}]},
+    {name:"Dana + Makarna",items:[{id:"f007",g:150},{id:"f042",g:200},{id:"f054",g:80}]},
+  ]
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+const AUTH_KEY = "ft_auth";
+const PASS = "061223";
+let authed = localStorage.getItem(AUTH_KEY) === "1";
+
+let STATE = {
+  tab:"dashboard",
+  workoutHistory:[],
+  nutritionLog:{},
+  activeWorkout:null,
+  workoutRunning:false,
+  elapsed:0,
+  loading:true,
+  timerRef:null,
+  autoSaveRef:null,
+  drawer:null,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIREBASE (global _db set by script tags in <head>)
+// ═══════════════════════════════════════════════════════════════════════════════
+let _db = null;
+
+function initFirebase(){
+  firebase.initializeApp({
+    apiKey:"AIzaSyC_rCc756u-fotafL10aHRX4ilRksbUrAE",
+    authDomain:"fittracksarikaya.firebaseapp.com",
+    projectId:"fittracksarikaya",
+    storageBucket:"fittracksarikaya.firebasestorage.app",
+    messagingSenderId:"107163437280",
+    appId:"1:107163437280:web:85f5be9a209b2cf4852885"
+  });
+  _db = firebase.firestore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOCALSTORAGE (active workout persistence)
+// ═══════════════════════════════════════════════════════════════════════════════
+const AW_KEY="ft_aw", AW_TS_KEY="ft_aw_ts";
+function saveAW(aw){ if(aw) localStorage.setItem(AW_KEY,JSON.stringify(aw)); else localStorage.removeItem(AW_KEY); }
+function loadAW(){ try{const v=localStorage.getItem(AW_KEY);return v?JSON.parse(v):null;}catch(e){return null;} }
+function saveTS(ts){ if(ts) localStorage.setItem(AW_TS_KEY,String(ts)); else localStorage.removeItem(AW_TS_KEY); }
+function loadTS(){ const v=localStorage.getItem(AW_TS_KEY); return v?parseInt(v):null; }
+function elapsedFromTS(){ const ts=loadTS(); return ts?Math.floor((Date.now()-ts)/1000):0; }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DB FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadData(){
+  try{
+    const [wSnap,nSnap] = await Promise.all([
+      _db.collection("workouts").orderBy("date","desc").get(),
+      _db.collection("nutrition_logs").get()
+    ]);
+    STATE.workoutHistory = wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}));
+    const log={};
+    nSnap.docs.forEach(d=>{ log[d.id]=d.data().meals||{}; });
+    STATE.nutritionLog = log;
+    STATE.loading = false;
+    const savedAW = loadAW();
+    if(savedAW){
+      STATE.activeWorkout=savedAW; STATE.workoutRunning=true;
+      STATE.elapsed=elapsedFromTS(); STATE.tab="workout";
+      startTimer();
+    }
+    render();
+  }catch(e){
+    console.error("loadData error:",e);
+    STATE.loading=false; render();
+  }
+}
+
+async function saveWorkoutDB(entry){
+  try{
+    const ref = await _db.collection("workouts").add({day:entry.day,date:entry.date,duration:entry.duration,sets:entry.sets});
+    STATE.workoutHistory=[{__id:ref.id,...entry},...STATE.workoutHistory];
+    render(); showToast("✓ Antrenman kaydedildi!");
+  }catch(e){ console.error("save error:",e); showToast("⚠️ Kaydetme hatası!"); }
+}
+
+async function saveNutritionDB(date,meals){
+  STATE.nutritionLog={...STATE.nutritionLog,[date]:meals}; render();
+  try{ await _db.collection("nutrition_logs").doc(date).set({date,meals}); }
+  catch(e){ console.error("nutrition error:",e); }
+}
+
+async function deleteWorkout(id){
+  if(!confirm("Bu antrenmanı silmek istediğine emin misin?")) return;
+  STATE.workoutHistory = STATE.workoutHistory.filter(w=>w.__id!==id);
+  render();
+  try{
+    await _db.collection("workouts").doc(id).delete();
+    showToast("✓ Antrenman silindi");
+  }catch(e){
+    console.error("delete error:",e);
+    showToast("⚠️ Silme hatası!");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function todayStr(){
+  return new Date().toLocaleDateString("tr-TR",{timeZone:"Europe/Istanbul",year:"numeric",month:"2-digit",day:"2-digit"}).split(".").reverse().join("-");
+}
+function fmtDate(s){ return new Date(s+"T12:00:00").toLocaleDateString("tr-TR",{month:"short",day:"numeric"}); }
+function fmtDur(s){ return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+function calcN(id,g){
+  const f=FOOD_DB.find(x=>x.id===id); if(!f) return{kcal:0,protein:0,carb:0,fat:0};
+  const r=g/100;
+  return{kcal:Math.round(f.p.kcal*r),protein:Math.round(f.p.protein*r*10)/10,carb:Math.round(f.p.carb*r*10)/10,fat:Math.round(f.p.fat*r*10)/10};
+}
+function getPRs(history){
+  const prs={};
+  history.forEach(s=>(s.sets||[]).forEach(set=>{
+    const v=set.weight*set.reps;
+    if(!prs[set.exId]||v>prs[set.exId].vol) prs[set.exId]={weight:set.weight,reps:set.reps,vol:v,date:s.date};
+  }));
+  return prs;
+}
+function getStreak(history){
+  if(!history.length) return 0;
+  const sorted=[...history].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let streak=0; const chk=new Date();
+  for(let i=0;i<60;i++){
+    const ds=chk.toISOString().split("T")[0];
+    if(sorted.find(h=>h.date===ds)) streak++; else if(i>0) break;
+    chk.setDate(chk.getDate()-1);
+  }
+  return streak;
+}
+function getTrend(history,exId){
+  const pts=[];
+  history.forEach(s=>{
+    const best=(s.sets||[]).filter(x=>x.exId===exId).reduce((a,b)=>(!a||b.weight>a.weight)?b:a,null);
+    if(best) pts.push({date:s.date,weight:best.weight});
+  });
+  return pts;
+}
+function getWeekVol(history){
+  const now=new Date(),ws=new Date(now); ws.setDate(now.getDate()-6);
+  const vol={};
+  history.filter(h=>new Date(h.date)>=ws).forEach(s=>{
+    (s.sets||[]).forEach(set=>{
+      const ex=ALL_EX.find(e=>e.id===set.exId);
+      if(ex) vol[ex.muscle]=(vol[ex.muscle]||0)+set.weight*set.reps;
+    });
+  });
+  return vol;
+}
+function pill(text,color){ return`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:${color}18;color:${color};border:1px solid ${color}30;display:inline-flex;align-items:center;gap:3px">${text}</span>`; }
+function donutSVG(eaten,target){
+  const pct=Math.min(eaten/(target||1),1),r=44,circ=2*Math.PI*r,dash=pct*circ;
+  return`<svg viewBox="0 0 100 100" width="90" height="90"><circle cx="50" cy="50" r="${r}" fill="none" stroke="#1A2530" stroke-width="10"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="#00BFFF" stroke-width="10" stroke-dasharray="${dash} ${circ}" stroke-linecap="round" transform="rotate(-90 50 50)"/><text x="50" y="46" text-anchor="middle" fill="#E8ECF0" font-size="13" font-weight="bold" font-family="Barlow Condensed,sans-serif">${eaten}</text><text x="50" y="58" text-anchor="middle" fill="#7A8898" font-size="8" font-family="Barlow Condensed,sans-serif">/ ${target}</text></svg>`;
+}
+function sparklineSVG(data,color,w,h){
+  if(!data||data.length<2) return`<span style="color:#555;font-size:11px">Yetersiz veri</span>`;
+  const ws=data.map(d=>d.weight),mn=Math.min(...ws),mx=Math.max(...ws),rng=mx-mn||1;
+  const pts=data.map((d,i)=>{const x=(i/(data.length-1))*w,y=h-((d.weight-mn)/rng)*(h-6)-3;return x+","+y;}).join(" ");
+  const lx=w,ly=h-((data[data.length-1].weight-mn)/rng)*(h-6)-3;
+  return`<svg width="${w}" height="${h}" style="overflow:visible"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="${color}"/></svg>`;
+}
+function showToast(msg){
+  const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIMER
+// ═══════════════════════════════════════════════════════════════════════════════
+function startTimer(){
+  if(STATE.timerRef) return;
+  STATE.timerRef=setInterval(()=>{
+    STATE.elapsed=elapsedFromTS();
+    const el=document.getElementById("elapsed-timer");
+    if(el) el.textContent=fmtDur(STATE.elapsed);
+  },1000);
+  STATE.autoSaveRef=setInterval(()=>{ if(STATE.activeWorkout) saveAW(STATE.activeWorkout); },30000);
+}
+function stopTimer(){
+  clearInterval(STATE.timerRef); clearInterval(STATE.autoSaveRef);
+  STATE.timerRef=null; STATE.autoSaveRef=null; STATE.elapsed=0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderLogin(){
+  return `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px;padding:32px;background:#080B10">
+    <div style="font-size:48px">⚡</div>
+    <div style="font-size:28px;font-weight:900;color:#00BFFF;letter-spacing:2px;text-transform:uppercase">FitTrack Pro</div>
+    <div style="font-size:14px;color:#556070;margin-bottom:8px">Şifrenizi girin</div>
+    <input id="pass-input" type="password" placeholder="••••••"
+      style="background:#0D1117;border:1px solid #2A3040;color:#E8ECF0;border-radius:10px;padding:14px 20px;font-size:22px;text-align:center;letter-spacing:8px;outline:none;width:100%;max-width:240px"
+      onkeydown="if(event.key==='Enter') checkPass()"
+      oninput="document.getElementById('pass-err').style.display='none'"/>
+    <div id="pass-err" style="display:none;color:#FF6B6B;font-size:13px;font-weight:700">Yanlış şifre</div>
+    <button onclick="checkPass()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:16px;font-weight:900;padding:14px 40px;letter-spacing:1px;text-transform:uppercase">GİRİŞ →</button>
+  </div>`;
+}
+
+function checkPass(){
+  const val = document.getElementById("pass-input").value;
+  if(val === PASS){
+    authed = true;
+    localStorage.setItem(AUTH_KEY, "1");
+    render();
+    initFirebase();
+    loadData();
+  } else {
+    document.getElementById("pass-err").style.display = "block";
+    document.getElementById("pass-input").value = "";
+    document.getElementById("pass-input").focus();
+  }
+}
+
+function render(){
+  if(!authed){
+    document.getElementById("root").innerHTML = renderLogin();
+    setTimeout(()=>{ const el=document.getElementById("pass-input"); if(el) el.focus(); }, 50);
+    return;
+  }
+  if(STATE.loading){
+    document.getElementById("root").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><div style="font-size:36px" class="pulse">⚡</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase">Yükleniyor...</div></div>`;
+    return;
+  }
+  const tabs=[{id:"dashboard",i:"⚡",l:"Panel"},{id:"workout",i:"🏋️",l:"Antrenman",badge:STATE.workoutRunning},{id:"history",i:"📋",l:"Geçmiş"},{id:"progress",i:"📈",l:"İlerleme"},{id:"nutrition",i:"🥗",l:"Beslenme"}];
+  let content="";
+  if(STATE.tab==="dashboard") content=renderDashboard();
+  else if(STATE.tab==="workout") content=renderWorkout();
+  else if(STATE.tab==="history") content=renderHistory();
+  else if(STATE.tab==="progress") content=renderProgress();
+  else if(STATE.tab==="nutrition") content=renderNutrition();
+
+  if(!STATE.drawer){
+    document.getElementById("root").innerHTML=`
+      <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:80px">${content}</div>
+      <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100">
+        ${tabs.map(t=>`<button onclick="setTab('${t.id}')" style="flex:1;padding:8px 0;background:none;border:none;color:${STATE.tab===t.id?"#00BFFF":"#556070"};display:flex;flex-direction:column;align-items:center;gap:1px;position:relative">
+          ${t.badge?`<span style="position:absolute;top:6px;right:20%;width:7px;height:7px;background:#FF4444;border-radius:50%" class="pulse"></span>`:""}
+          <span style="font-size:18px">${t.i}</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${t.l}</span>
+          ${STATE.tab===t.id?`<div class="tab-line"></div>`:""}
+        </button>`).join("")}
+      </div>
+      <div id="drawer-container"></div>`;
+  } else {
+    let dc=document.getElementById("drawer-container");
+    if(!dc){
+      document.getElementById("root").innerHTML=`
+        <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:80px">${content}</div>
+        <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100">
+          ${tabs.map(t=>`<button onclick="setTab('${t.id}')" style="flex:1;padding:8px 0;background:none;border:none;color:${STATE.tab===t.id?"#00BFFF":"#556070"};display:flex;flex-direction:column;align-items:center;gap:1px;position:relative">
+            <span style="font-size:18px">${t.i}</span>
+            <span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${t.l}</span>
+            ${STATE.tab===t.id?`<div class="tab-line"></div>`:""}
+          </button>`).join("")}
+        </div>
+        <div id="drawer-container"></div>`;
+      dc=document.getElementById("drawer-container");
+    }
+    renderDrawerOnly();
+  }
+}
+
+function renderDrawerOnly(){
+  const dc=document.getElementById("drawer-container"); if(!dc) return;
+  const focused=document.activeElement;
+  const fid=focused?focused.id:null;
+  const ss=focused&&focused.tagName==="INPUT"?focused.selectionStart:null;
+  const se=focused&&focused.tagName==="INPUT"?focused.selectionEnd:null;
+  dc.innerHTML=renderDrawer();
+  if(fid){const el=document.getElementById(fid);if(el){el.focus();if(ss!==null)try{el.setSelectionRange(ss,se);}catch(e){}}}
+  else{const si=document.getElementById("drawer-search");if(si){const l=si.value.length;si.focus();try{si.setSelectionRange(l,l);}catch(e){}}}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCREENS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderDashboard(){
+  const prs=getPRs(STATE.workoutHistory);
+  const streak=getStreak(STATE.workoutHistory);
+  const now=new Date(),thisWeek=STATE.workoutHistory.filter(h=>(now-new Date(h.date))/86400000<=7).length;
+  const topPRs=Object.entries(prs).map(([exId,pr])=>({exId,...pr,name:ALL_EX.find(e=>e.id===exId)?.name||exId})).sort((a,b)=>b.vol-a.vol).slice(0,3);
+  let html=`<div style="padding:16px">
+  <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:14px;text-transform:uppercase"><span style="color:#00BFFF">Panelim</span></h1>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">
+    ${[{l:"Seri",v:streak,u:"gün",c:"#FFD700",i:"🔥"},{l:"Bu Hafta",v:thisWeek,u:"seans",c:"#39FF14",i:"📅"},{l:"Toplam",v:STATE.workoutHistory.length,u:"antrenman",c:"#00BFFF",i:"💪"}].map(s=>`
+    <div style="background:#0D1117;border:1px solid ${s.c}30;border-radius:10px;padding:12px 8px;text-align:center">
+      <div style="font-size:22px;margin-bottom:4px">${s.i}</div>
+      <div style="font-size:28px;font-weight:900;color:${s.c};line-height:1">${s.v}</div>
+      <div style="font-size:9px;color:${s.c}99;letter-spacing:1px;text-transform:uppercase;margin-top:2px">${s.u}</div>
+      <div style="font-size:10px;color:#7A8898;margin-top:2px;text-transform:uppercase">${s.l}</div>
+    </div>`).join("")}
+  </div>
+  <h2 style="font-size:13px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Hızlı Başlat</h2>`;
+  Object.entries(WORKOUT_PLAN).forEach(([dayName,plan])=>{
+    html+=`<button onclick="startWorkout('${dayName}')" style="width:100%;background:linear-gradient(135deg,${plan.color}18,${plan.color}08);border:1px solid ${plan.color}40;border-radius:10px;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;color:#E8ECF0;text-align:left">
+      <div><div style="font-size:17px;font-weight:800;text-transform:uppercase;color:${plan.color}">${dayName}</div>
+      <div style="font-size:11px;color:#7A8898">${plan.muscles.join(" · ")} · ${plan.exercises.length} egzersiz</div></div>
+      <div style="background:${plan.color};color:#000;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:800;flex-shrink:0">BAŞLA →</div>
+    </button>`;
+  });
+  html+=`<h2 style="font-size:13px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;margin-top:8px">Kişisel Rekorlar</h2>`;
+  if(!topPRs.length) html+=`<div style="color:#556070;text-align:center;padding:20px">Henüz antrenman kaydı yok</div>`;
+  topPRs.forEach((pr,i)=>{
+    const ex=ALL_EX.find(e=>e.id===pr.exId),mc=MC[ex?.muscle]||"#00BFFF";
+    html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px">
+      <div style="font-size:20px;min-width:26px;text-align:center">${i===0?"🥇":i===1?"🥈":"🥉"}</div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:700;text-transform:uppercase">${pr.name}</div><div style="font-size:11px;color:#7A8898">${fmtDate(pr.date)}</div></div>
+      <div style="text-align:right"><div style="font-size:19px;font-weight:900;color:${mc}">${pr.weight}<span style="font-size:11px"> kg</span></div><div style="font-size:11px;color:#7A8898">× ${pr.reps}</div></div>
+    </div>`;
+  });
+  return html+`</div>`;
+}
+
+function renderWorkout(){
+  const aw=STATE.activeWorkout;
+  if(!aw) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:56px;margin-bottom:16px">🏋️</div><div style="font-size:20px;font-weight:700;text-transform:uppercase">Aktif Antrenman Yok</div><div style="font-size:14px;margin-top:8px">Panelden bir seans başlat</div></div>`;
+  const pc=WORKOUT_PLAN[aw.dayName]?.color||"#00BFFF";
+  const prs=getPRs(STATE.workoutHistory);
+  const totalDone=aw.exercises.reduce((a,ex)=>a+ex.sets.filter(s=>s.done).length,0);
+  let html=`<div style="padding:16px;padding-bottom:140px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+    <div>
+      <div style="font-size:11px;color:#7A8898;letter-spacing:2px;text-transform:uppercase">${aw.startDate}</div>
+      <h1 style="font-size:22px;font-weight:900;color:${pc};text-transform:uppercase;line-height:1">${aw.dayName}</h1>
+      <div style="font-size:12px;color:#7A8898">${totalDone} set tamamlandı</div>
+    </div>
+    <div style="text-align:right">
+      <div id="elapsed-timer" class="glow" style="font-size:30px;font-weight:900;color:#00BFFF;font-variant-numeric:tabular-nums">${fmtDur(STATE.elapsed)}</div>
+      <div style="font-size:9px;color:#7A8898;letter-spacing:1px">GEÇEN SÜRE</div>
+    </div>
+  </div>
+  <div style="background:#0D1117;border:1px solid #FF6B3530;border-radius:10px;margin-bottom:8px">
+    <button onclick="toggleSec('warmup')" style="width:100%;background:none;border:none;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;color:#FF6B35;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px">🔥 ISINMA <span id="warmup-arr" style="color:#556070">▼</span></button>
+    <div id="warmup-body" style="display:none;padding:0 13px 11px">${["5 dk yürüyüş/bisiklet","Kol çevirmeler × 15","Kalça çevirme × 10","Bacak sallama × 10","Omuz açma × 10"].map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#FF6B35;font-size:10px">▸</span>${x}</div>`).join("")}</div>
+  </div>`;
+  aw.exercises.forEach((ex,ei)=>{
+    const mc=MC[ex.muscle]||"#00BFFF",ep=prs[ex.id];
+    html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="padding:11px 13px;border-bottom:1px solid ${mc}20;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:16px;font-weight:800;text-transform:uppercase">${ex.name}</div>
+        <span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${mc};background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${ep?`<div style="font-size:10px;color:#FFD700">🏆 ${ep.weight}×${ep.reps}</div>`:""}
+          <button onclick="removeEx(${ei})" style="background:#2A1010;border:1px solid #FF444428;border-radius:6px;color:#FF6B6B;font-size:11px;padding:3px 7px;font-weight:700">✕</button>
+        </div>
+      </div>
+      <div style="padding:7px 13px">
+        <div style="display:grid;grid-template-columns:24px 1fr 65px 65px 34px;gap:3px;margin-bottom:3px">
+          ${["SET","ÖNCEKİ","KG","TEKRAR",""].map(h=>`<div style="font-size:8px;color:#556070;letter-spacing:1px;text-align:center;font-weight:700">${h}</div>`).join("")}
+        </div>
+        ${ex.sets.map((set,si)=>`
+          <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:24px 1fr 65px 65px 34px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
+            <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
+            <div style="font-size:11px;color:#556070;text-align:center">${set.prevW?set.prevW+"×"+set.prevR:"—"}</div>
+            <input class="sr-input" type="number" value="${set.weight}" oninput="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
+            <input class="sr-input" type="number" value="${set.reps}" oninput="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
+            <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:15px;height:30px;display:flex;align-items:center;justify-content:center;width:34px">${set.done?"✓":"○"}</button>
+          </div>`).join("")}
+        <button onclick="addSet(${ei})" style="margin-top:5px;background:none;border:1px dashed ${mc}40;border-radius:5px;color:${mc};font-size:11px;font-weight:700;padding:5px 0;width:100%;text-transform:uppercase">+ Set Ekle</button>
+      </div>
+    </div>`;
+  });
+  html+=`<button onclick="openExPicker()" style="width:100%;background:none;border:1px dashed #00BFFF40;border-radius:10px;color:#00BFFF;font-size:14px;font-weight:700;padding:13px;text-transform:uppercase;margin-bottom:10px">+ Egzersiz Ekle</button>
+  <div style="background:#0D1117;border:1px solid #00BFFF30;border-radius:10px;margin-bottom:8px">
+    <button onclick="toggleSec('cooldown')" style="width:100%;background:none;border:none;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;color:#00BFFF;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px">❄️ SOĞUMA <span id="cooldown-arr" style="color:#556070">▼</span></button>
+    <div id="cooldown-body" style="display:none;padding:0 13px 11px">${["Kedi-inek × 10","Çocuk pozu 30sn","Kalça fleksör 30sn","Piriformis 30sn","Kuş-köpek × 10","Ölü böcek × 10","Diz-göğüs 30sn"].map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#00BFFF;font-size:10px">▸</span>${x}</div>`).join("")}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">
+    <button onclick="discardWorkout()" style="background:#1A0808;border:1px solid #FF444440;border-radius:10px;color:#FF6B6B;font-size:15px;font-weight:800;padding:13px;text-transform:uppercase">İptal</button>
+    <button onclick="finishWorkout()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:15px;font-weight:900;padding:13px;text-transform:uppercase">Bitir ✓</button>
+  </div></div>`;
+  return html;
+}
+
+function renderHistory(){
+  const prs=getPRs(STATE.workoutHistory);
+  const sorted=[...STATE.workoutHistory].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let html=`<div style="padding:16px"><h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:14px;text-transform:uppercase"><span style="color:#00BFFF">Antrenman</span> Geçmişi</h1>`;
+  if(!sorted.length) html+=`<div style="color:#556070;text-align:center;padding:40px">Henüz antrenman yok.</div>`;
+  sorted.forEach(s=>{
+    const color=WORKOUT_PLAN[s.day]?.color||"#00BFFF";
+    const exIds=[...new Set((s.sets||[]).map(x=>x.exId))];
+    const sePRs=(s.sets||[]).filter(x=>{const pr=prs[x.exId];return pr&&pr.date===s.date&&pr.weight===x.weight&&pr.reps===x.reps;}).map(x=>x.exId);
+    html+=`<div style="background:#0D1117;border:1px solid ${color}25;border-radius:12px;margin-bottom:10px;padding:13px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
+        <div><div style="font-size:17px;font-weight:800;text-transform:uppercase;color:${color}">${s.day}</div><div style="font-size:11px;color:#7A8898">${fmtDate(s.date)}</div></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="text-align:right"><div style="font-size:13px;font-weight:700">⏱ ${s.duration} dk</div><div style="font-size:11px;color:#7A8898">${(s.sets||[]).length} set</div></div>
+          <button onclick="deleteWorkout('${s.__id}')" style="background:#1A0808;border:1px solid #FF444440;border-radius:8px;color:#FF6B6B;font-size:12px;font-weight:700;padding:6px 10px;flex-shrink:0">🗑</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${exIds.map(eid=>{const ex=ALL_EX.find(e=>e.id===eid),mc=MC[ex?.muscle]||"#00BFFF";return pill((ex?.name||eid)+(sePRs.includes(eid)?" 🏆":""),mc);}).join("")}</div>
+    </div>`;
+  });
+  return html+`</div>`;
+}
+
+function renderProgress(){
+  const prs=getPRs(STATE.workoutHistory);
+  const wv=getWeekVol(STATE.workoutHistory),mx=Math.max(...Object.values(wv),1);
+  let html=`<div style="padding:16px"><h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:14px;text-transform:uppercase"><span style="color:#00BFFF">İlerleme</span> Takibi</h1>
+  <div style="background:#0D1117;border:1px solid #1E2530;border-radius:12px;padding:14px;margin-bottom:16px">
+    <div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Haftalık Hacim</div>`;
+  if(!Object.keys(wv).length) html+=`<div style="color:#556070;font-size:13px;text-align:center;padding:16px">Bu hafta veri yok</div>`;
+  else Object.entries(wv).sort((a,b)=>b[1]-a[1]).forEach(([m,v])=>{
+    const mc=MC[m]||"#00BFFF",p=(v/mx)*100;
+    html+=`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px;font-weight:700;text-transform:uppercase;color:${mc}">${m}</span><span style="font-size:12px;color:#7A8898">${Math.round(v).toLocaleString()}</span></div><div style="height:8px;background:#1A2530;border-radius:4px;overflow:hidden"><div style="height:100%;width:${p}%;background:linear-gradient(90deg,${mc},${mc}88);border-radius:4px"></div></div></div>`;
+  });
+  html+=`</div><div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Egzersiz Trendleri</div>`;
+  ALL_EX.forEach(ex=>{
+    const trend=getTrend(STATE.workoutHistory,ex.id),pr=prs[ex.id],mc=MC[ex.muscle]||"#00BFFF";
+    if(!trend.length) return;
+    html+=`<div style="background:#0D1117;border:1px solid ${mc}20;border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:800;text-transform:uppercase;margin-bottom:2px">${ex.name}</div>
+      <span style="font-size:8px;color:${mc};font-weight:700;background:${mc}20;padding:1px 6px;border-radius:3px;text-transform:uppercase">${ex.muscle}</span>
+      ${pr?`<div style="font-size:10px;color:#FFD700;margin-top:3px">🏆 KR: <strong>${pr.weight}kg</strong> × ${pr.reps}</div>`:""}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${sparklineSVG(trend,mc,110,34)}<div style="font-size:9px;color:#556070">${fmtDate(trend[0].date)} → ${fmtDate(trend[trend.length-1].date)}</div></div>
+    </div>`;
+  });
+  return html+`</div>`;
+}
+
+function renderNutrition(){
+  const date=todayStr();
+  const emptyM={"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
+  const dayM=STATE.nutritionLog[date]||emptyM;
+  function totals(m){let k=0,p=0,c=0,f=0;Object.values(m).forEach(items=>items.forEach(it=>{const n=calcN(it.id,it.g);k+=n.kcal;p+=n.protein;c+=n.carb;f+=n.fat;}));return{kcal:Math.round(k),protein:Math.round(p*10)/10,carb:Math.round(c*10)/10,fat:Math.round(f*10)/10};}
+  function mTotals(items){let k=0,p=0;items.forEach(it=>{const n=calcN(it.id,it.g);k+=n.kcal;p+=n.protein;});return{kcal:Math.round(k),protein:Math.round(p*10)/10};}
+  const T=totals(dayM);
+  const MC2={"Kahvaltı":"#FFD700","Ara Öğün":"#FF6B35","Akşam Yemeği":"#00BFFF"};
+  const MI={"Kahvaltı":"🌅","Ara Öğün":"🥜","Akşam Yemeği":"🍽️"};
+  let html=`<div style="padding:16px;padding-bottom:100px">
+  <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase"><span style="color:#00BFFF">Beslenme</span> Takibi</h1>
+  <div style="font-size:11px;color:#7A8898;margin-bottom:12px">${date} · Hedef: ${TARGETS.kcal} kcal / ${TARGETS.protein}g protein</div>
+  <div style="background:#0D1117;border:1px solid #1E2530;border-radius:14px;padding:14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:14px">
+      ${donutSVG(T.kcal,TARGETS.kcal)}
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:#7A8898;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Bugün</div>
+        ${[{l:"Protein",v:T.protein,t:TARGETS.protein,c:"#FF6B6B"},{l:"Karb",v:T.carb,t:TARGETS.carb,c:"#BB86FC"},{l:"Yağ",v:T.fat,t:TARGETS.fat,c:"#FFD700"}].map(m=>{
+          const p=Math.min((m.v/m.t)*100,100);
+          return`<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:11px;font-weight:700;color:${m.c}">${m.l}</span><span style="font-size:11px;color:#7A8898">${m.v}/${m.t}g</span></div><div style="height:5px;background:#1A2530;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p}%;background:${m.c};border-radius:3px"></div></div></div>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>
+  <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#7A8898;line-height:1.7">
+    <span style="color:#00BFFF;font-weight:700">📌 Hedefler:</span> ${TARGETS.kcal} kcal · ${TARGETS.protein}g P · ${TARGETS.carb}g K · ${TARGETS.fat}g Y<br>
+    <span style="font-size:10px">Kahvaltı ~600 / Ara ~300 / Akşam ~1200 kcal</span>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div style="font-size:11px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase">Plan Önerileri</div>
+    <button onclick="toggleSec('sugg')" style="background:none;border:none;color:#00BFFF;font-size:11px;font-weight:700">Göster/Gizle</button>
+  </div>
+  <div id="sugg-body">`;
+  Object.entries(MEAL_SUGG).forEach(([mt,suggs])=>{
+    const mc=MC2[mt];
+    html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:10px;padding:9px 12px;margin-bottom:7px">
+      <div style="font-size:12px;font-weight:800;color:${mc};text-transform:uppercase;margin-bottom:7px">${MI[mt]} ${mt}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">`;
+    suggs.forEach((s,i)=>{
+      const ns=s.items.map(it=>calcN(it.id,it.g)),sk=ns.reduce((a,b)=>a+b.kcal,0),sp=ns.reduce((a,b)=>a+b.protein,0);
+      html+=`<button onclick="loadSugg('${mt}',${i})" style="background:${mc}15;border:1px solid ${mc}30;border-radius:7px;padding:7px 10px;color:#E8ECF0;text-align:left"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:10px;color:#7A8898">${Math.round(sk)} kcal · ${Math.round(sp*10)/10}g P</div></button>`;
+    });
+    html+=`</div></div>`;
+  });
+  html+=`</div>`;
+  Object.entries(dayM).forEach(([mt,items])=>{
+    const mc=MC2[mt],mt2=mTotals(items);
+    html+=`<div style="background:#0D1117;border:1px solid ${mc}30;border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div style="padding:11px 13px;border-bottom:1px solid ${mc}20;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:16px;font-weight:800;text-transform:uppercase;color:${mc}">${MI[mt]} ${mt}</div>
+        <div style="font-size:10px;color:#7A8898">${mt2.kcal} kcal · ${mt2.protein}g protein</div></div>
+        <button onclick="openFoodPicker('${mt}')" style="background:${mc};color:#000;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:800">+ EKLE</button>
+      </div>
+      <div style="padding:6px 13px">`;
+    if(!items.length) html+=`<div style="color:#556070;font-size:12px;padding:6px 0;text-align:center">Henüz yemek eklenmedi</div>`;
+    items.forEach((item,idx)=>{
+      const food=FOOD_DB.find(f=>f.id===item.id),n=calcN(item.id,item.g);
+      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1A2530">
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">${food?.name||item.id}</div><div style="font-size:10px;color:#7A8898">${item.g}g</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:${mc}">${n.kcal} kcal</div><div style="font-size:10px;color:#7A8898">P:${n.protein} K:${n.carb} Y:${n.fat}</div></div>
+          <button onclick="removeFoodItem('${mt}',${idx})" style="background:#2A1010;border:1px solid #FF444428;border-radius:5px;color:#FF6B6B;font-size:11px;padding:3px 7px;font-weight:700">✕</button>
+        </div></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  return html+`</div>`;
+}
+
+function renderDrawer(){
+  if(!STATE.drawer) return "";
+  const d=STATE.drawer;
+  if(d.type==="exPicker"){
+    const mode=d.mode||"list";
+    return`<div class="drawer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="font-size:17px;font-weight:800;text-transform:uppercase">Egzersiz Ekle</h3>
+        <button onclick="closeDrawer()" style="background:none;border:none;color:#7A8898;font-size:22px">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button onclick="setDD({mode:'list'})" style="flex:1;background:${mode==="list"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="list"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Listeden Seç</button>
+        <button onclick="setDD({mode:'custom'})" style="flex:1;background:${mode==="custom"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="custom"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Özel Ekle</button>
+      </div>
+      ${mode==="list"?ALL_EX.map(ex=>{const mc=MC[ex.muscle]||"#00BFFF";return`<button onclick="addExercise('${ex.id}')" style="width:100%;background:#141820;border:1px solid ${mc}20;border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0"><span style="font-size:14px;font-weight:700;text-transform:uppercase">${ex.name}</span><span style="font-size:9px;color:${mc};font-weight:700;background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></button>`;}).join(""):`
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Egzersiz Adı</div>
+          <input id="drawer-custom-name" class="fi" placeholder="örn. Smith Machine" value="${d.customName||""}" oninput="updateDrawerField('customName',this.value)"/></div>
+          <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kas Grubu</div>
+          <select id="drawer-custom-muscle" onchange="updateDrawerField('customMuscle',this.value)" style="background:#1A1F28;border:1px solid #2A3040;color:#E8ECF0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:600;outline:none;width:100%">
+            ${Object.keys(MC).map(m=>`<option value="${m}" ${m===(d.customMuscle||"Custom")?"selected":""}>${m}</option>`).join("")}
+          </select></div>
+          <button onclick="addCustomEx()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:15px;font-weight:900;padding:11px;text-transform:uppercase">Egzersiz Ekle →</button>
+        </div>`}
+    </div>`;
+  }
+  if(d.type==="foodPicker"){
+    const{mealType,q="",cat="Hepsi",pending,grams="100"}=d;
+    const cats=["Hepsi",...new Set(FOOD_DB.map(f=>f.cat))];
+    const filtered=FOOD_DB.filter(f=>(cat==="Hepsi"||f.cat===cat)&&f.name.toLowerCase().includes(q.toLowerCase()));
+    if(pending){
+      const n=calcN(pending.id,parseFloat(grams)||0);
+      return`<div class="drawer">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="font-size:16px;font-weight:800;text-transform:uppercase">${mealType} — Ekle</h3>
+          <button onclick="closeDrawer()" style="background:none;border:none;color:#7A8898;font-size:22px">✕</button>
+        </div>
+        <div style="background:#141820;border:1px solid #2A3040;border-radius:10px;padding:11px 13px;margin-bottom:12px">
+          <div style="font-size:15px;font-weight:800;text-transform:uppercase">${pending.name}</div>
+          <div style="font-size:11px;color:#7A8898">${pending.cat}</div>
+        </div>
+        <div style="margin-bottom:12px"><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Gramaj (g)</div>
+        <input id="drawer-grams" class="fi" type="number" value="${grams}" oninput="updateDrawerField('grams',this.value)" placeholder="100"/></div>
+        <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:10px;padding:11px 13px;margin-bottom:12px">
+          <div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px">Besin Değerleri (${grams||0}g)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;text-align:center">
+            ${[{l:"Kalori",v:n.kcal,u:"kcal",c:"#00BFFF"},{l:"Protein",v:n.protein,u:"g",c:"#FF6B6B"},{l:"Karb",v:n.carb,u:"g",c:"#BB86FC"},{l:"Yağ",v:n.fat,u:"g",c:"#FFD700"}].map(m=>`
+              <div style="background:#1A2530;border-radius:7px;padding:7px 3px">
+                <div style="font-size:17px;font-weight:900;color:${m.c};line-height:1">${m.v}</div>
+                <div style="font-size:8px;color:${m.c}99;text-transform:uppercase">${m.u}</div>
+                <div style="font-size:8px;color:#556070;margin-top:1px">${m.l}</div>
+              </div>`).join("")}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+          <button onclick="setDD({pending:null})" style="background:#1A2530;border:1px solid #2A3040;border-radius:10px;color:#A0B0C0;font-size:13px;font-weight:700;padding:11px">← Geri</button>
+          <button onclick="confirmFood()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:900;padding:11px">Ekle ✓</button>
+        </div>
+      </div>`;
+    }
+    return`<div class="drawer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="font-size:16px;font-weight:800;text-transform:uppercase">${mealType} — Yemek Ekle</h3>
+        <button onclick="closeDrawer()" style="background:none;border:none;color:#7A8898;font-size:22px">✕</button>
+      </div>
+      <input id="drawer-search" class="fi" placeholder="🔍 Besin ara..." value="${q}" oninput="updateSearch(this.value)" style="margin-bottom:8px"/>
+      <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px">
+        ${cats.map(c=>`<button onclick="setDD({cat:'${c}'})" style="flex-shrink:0;background:${cat===c?"#00BFFF":"#1A2530"};border:none;border-radius:6px;color:${cat===c?"#000":"#A0B0C0"};font-size:10px;font-weight:700;padding:5px 10px;white-space:nowrap;text-transform:uppercase">${c}</button>`).join("")}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${filtered.slice(0,40).map(food=>`
+          <button onclick="selectFood('${food.id}')" style="background:#141820;border:1px solid #2A3040;border-radius:7px;padding:9px 11px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0;width:100%">
+            <div style="text-align:left"><div style="font-size:13px;font-weight:700">${food.name}</div><div style="font-size:10px;color:#7A8898">${food.cat}</div></div>
+            <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#00BFFF">${food.p.kcal} kcal</div><div style="font-size:10px;color:#7A8898">P:${food.p.protein}g</div></div>
+          </button>`).join("")}
+        ${filtered.length>40?`<div style="color:#556070;font-size:11px;text-align:center;padding:8px">+ ${filtered.length-40} daha — aramayı daralt</div>`:""}
+      </div>
+    </div>`;
+  }
+  return "";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+function setTab(t){ STATE.tab=t; render(); }
+function toggleSec(id){
+  const b=document.getElementById(id+"-body"),a=document.getElementById(id+"-arr");
+  if(!b) return; const open=b.style.display==="none";
+  b.style.display=open?"block":"none"; if(a) a.textContent=open?"▲":"▼";
+}
+
+function startWorkout(dayName){
+  const plan=WORKOUT_PLAN[dayName];
+  const last=[...STATE.workoutHistory].reverse().find(h=>h.day===dayName);
+  const exercises=plan.exercises.map(ex=>{
+    const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
+    return{...ex,sets:Array.from({length:ex.ds},(_,i)=>({setNum:i+1,weight:ls[i]?.weight||"",reps:ls[i]?.reps||ex.dr,done:false,prevW:ls[i]?.weight||null,prevR:ls[i]?.reps||null}))};
+  });
+  const aw={dayName,exercises,startDate:todayStr()};
+  STATE.activeWorkout=aw; STATE.workoutRunning=true; STATE.tab="workout";
+  saveTS(Date.now()); saveAW(aw); startTimer(); render();
+}
+
+function updSet(ei,si,field,value){
+  const aw=STATE.activeWorkout; if(!aw) return;
+  const ex=[...aw.exercises],sets=[...ex[ei].sets];
+  const val=field==="done"?(value===true||value==="true"):value;
+  sets[si]={...sets[si],[field]:val}; ex[ei]={...ex[ei],sets};
+  STATE.activeWorkout={...aw,exercises:ex};
+  saveAW(STATE.activeWorkout); render();
+}
+function addSet(ei){
+  const aw=STATE.activeWorkout; if(!aw) return;
+  const ex=[...aw.exercises],last=ex[ei].sets[ex[ei].sets.length-1];
+  ex[ei]={...ex[ei],sets:[...ex[ei].sets,{setNum:ex[ei].sets.length+1,weight:last?.weight||"",reps:last?.reps||10,done:false,prevW:null,prevR:null}]};
+  STATE.activeWorkout={...aw,exercises:ex}; saveAW(STATE.activeWorkout); render();
+}
+function removeEx(ei){
+  const aw=STATE.activeWorkout; if(!aw) return;
+  STATE.activeWorkout={...aw,exercises:aw.exercises.filter((_,i)=>i!==ei)};
+  saveAW(STATE.activeWorkout); render();
+}
+function openExPicker(){ STATE.drawer={type:"exPicker",mode:"list",customName:"",customMuscle:"Custom"}; render(); }
+function addExercise(exId){
+  const ex=ALL_EX.find(e=>e.id===exId); if(!ex||!STATE.activeWorkout) return;
+  STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+  saveAW(STATE.activeWorkout); STATE.drawer=null; render();
+}
+function addCustomEx(){
+  const d=STATE.drawer; if(!d||!d.customName?.trim()||!STATE.activeWorkout) return;
+  const ex={id:"c"+Date.now(),name:d.customName.trim(),muscle:d.customMuscle||"Custom",ds:3,dr:10};
+  STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:10,done:false,prevW:null,prevR:null}]}]};
+  saveAW(STATE.activeWorkout); STATE.drawer=null; render();
+}
+
+function renderDrawerOnly(){
+  const dc=document.getElementById("drawer-container"); if(!dc) return;
+  const focused=document.activeElement;
+  const fid=focused?focused.id:null;
+  const ss=focused&&focused.tagName==="INPUT"?focused.selectionStart:null;
+  const se=focused&&focused.tagName==="INPUT"?focused.selectionEnd:null;
+  dc.innerHTML=renderDrawer();
+  if(fid){const el=document.getElementById(fid);if(el){el.focus();if(ss!==null)try{el.setSelectionRange(ss,se);}catch(e){}}}
+  else{const si=document.getElementById("drawer-search");if(si){const l=si.value.length;si.focus();try{si.setSelectionRange(l,l);}catch(e){}}}
+}
+function updateSearch(val){ STATE.drawer={...STATE.drawer,q:val}; renderDrawerOnly(); }
+function updateDrawerField(field,val){ STATE.drawer={...STATE.drawer,[field]:val}; renderDrawerOnly(); }
+function setDD(patch){ STATE.drawer={...STATE.drawer,...patch}; renderDrawerOnly(); }
+function closeDrawer(){ STATE.drawer=null; render(); }
+
+async function finishWorkout(){
+  const aw=STATE.activeWorkout; if(!aw) return;
+  const allSets=[];
+  aw.exercises.forEach(ex=>ex.sets.filter(s=>s.done).forEach(s=>allSets.push({exId:ex.id,weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0})));
+  const entry={day:aw.dayName,date:aw.startDate,duration:Math.round(STATE.elapsed/60),sets:allSets};
+  stopTimer(); saveAW(null); saveTS(null);
+  STATE.activeWorkout=null; STATE.workoutRunning=false; STATE.tab="history";
+  render(); await saveWorkoutDB(entry);
+}
+function discardWorkout(){
+  stopTimer(); saveAW(null); saveTS(null);
+  STATE.activeWorkout=null; STATE.workoutRunning=false; STATE.tab="dashboard"; render();
+}
+
+function openFoodPicker(mealType){ STATE.drawer={type:"foodPicker",mealType,q:"",cat:"Hepsi",pending:null,grams:"100"}; render(); }
+function selectFood(foodId){ const food=FOOD_DB.find(f=>f.id===foodId); if(!food) return; STATE.drawer={...STATE.drawer,pending:food,grams:"100"}; renderDrawerOnly(); }
+
+async function confirmFood(){
+  const d=STATE.drawer; if(!d||!d.pending) return;
+  const date=todayStr();
+  const emptyM={"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
+  const dayM=STATE.nutritionLog[date]||emptyM;
+  const updated={...dayM,[d.mealType]:[...(dayM[d.mealType]||[]),{id:d.pending.id,g:parseFloat(d.grams)||100}]};
+  STATE.drawer=null; await saveNutritionDB(date,updated);
+}
+
+async function removeFoodItem(mealType,idx){
+  const date=todayStr();
+  const emptyM={"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
+  const dayM=STATE.nutritionLog[date]||emptyM;
+  const updated={...dayM,[mealType]:dayM[mealType].filter((_,i)=>i!==idx)};
+  await saveNutritionDB(date,updated);
+}
+async function loadSugg(mealType,idx){
+  const sugg=MEAL_SUGG[mealType]?.[idx]; if(!sugg) return;
+  const date=todayStr();
+  const emptyM={"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
+  let dayM={...(STATE.nutritionLog[date]||emptyM)};
+  sugg.items.forEach(it=>dayM={...dayM,[mealType]:[...(dayM[mealType]||[]),{id:it.id,g:it.g}]});
+  await saveNutritionDB(date,dayM);
+}
+
+// BOOT
+render();
+if(authed){
+  try{
+    initFirebase();
+    loadData();
+  }catch(e){
+    console.error("Firebase init error:",e);
+    STATE.loading=false; render();
+  }
+}
+</script>
+</body>
+</html>

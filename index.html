@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -12,8 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#080B10;color:#E8ECF0;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;-webkit-font-smoothing:antialiased}
-#root{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+body{background:#080B10;color:#E8ECF0;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top)}
+#root{max-width:480px;margin:0 auto;min-height:100vh;min-height:-webkit-fill-available;display:flex;flex-direction:column}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#00BFFF44;border-radius:2px}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 input,select,button{font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif}
@@ -316,6 +316,7 @@ let STATE = {
   workoutHistory:[],
   nutritionLog:{},
   customFoods:[],
+  customExercises:[],
   activeWorkout:null,
   workoutRunning:false,
   elapsed:0,
@@ -358,16 +359,18 @@ function elapsedFromTS(){ const ts=loadTS(); return ts?Math.floor((Date.now()-ts
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
   try{
-    const [wSnap,nSnap,cfSnap] = await Promise.all([
+    const [wSnap,nSnap,cfSnap,ceSnap] = await Promise.all([
       _db.collection("workouts").orderBy("date","desc").get(),
       _db.collection("nutrition_logs").get(),
-      _db.collection("custom_foods").get()
+      _db.collection("custom_foods").get(),
+      _db.collection("custom_exercises").get()
     ]);
     STATE.workoutHistory = wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}));
     const log={};
     nSnap.docs.forEach(d=>{ log[d.id]=d.data().meals||{}; });
     STATE.nutritionLog = log;
     STATE.customFoods = cfSnap.docs.map(d=>({__id:d.id,...d.data()}));
+    STATE.customExercises = ceSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.loading = false;
     const savedAW = loadAW();
     if(savedAW){
@@ -445,16 +448,44 @@ function getPRs(history){
   }));
   return prs;
 }
+function getWeekKey(dateStr){
+  const d=new Date(dateStr+"T12:00:00");
+  const jan1=new Date(d.getFullYear(),0,1);
+  const week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  return d.getFullYear()+"W"+String(week).padStart(2,"0");
+}
 function getStreak(history){
-  if(!history.length) return 0;
-  const sorted=[...history].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  let streak=0; const chk=new Date();
-  for(let i=0;i<60;i++){
-    const ds=chk.toISOString().split("T")[0];
-    if(sorted.find(h=>h.date===ds)) streak++; else if(i>0) break;
-    chk.setDate(chk.getDate()-1);
+  if(!history.length) return {current:0, best:0};
+  // Get unique weeks with workouts
+  const weeks=[...new Set(history.map(h=>getWeekKey(h.date)))].sort().reverse();
+  const currentWeek=getWeekKey(new Date().toISOString().split("T")[0]);
+  const lastWeek=getWeekKey(new Date(Date.now()-7*86400000).toISOString().split("T")[0]);
+  // Streak counts if current or last week has workout
+  if(!weeks.includes(currentWeek)&&!weeks.includes(lastWeek)) return {current:0, best:calcBestStreak(weeks)};
+  // Count consecutive weeks back from now
+  let streak=0;
+  let chkDate=new Date();
+  for(let i=0;i<200;i++){
+    const wk=getWeekKey(chkDate.toISOString().split("T")[0]);
+    if(weeks.includes(wk)) streak++;
+    else if(i>7) break; // allow current week gap
+    chkDate.setDate(chkDate.getDate()-7);
+    if(streak>0&&!weeks.includes(wk)) break;
   }
-  return streak;
+  return {current:streak, best:Math.max(streak, calcBestStreak(weeks))};
+}
+function calcBestStreak(sortedWeeks){
+  if(!sortedWeeks.length) return 0;
+  let best=1,cur=1;
+  for(let i=1;i<sortedWeeks.length;i++){
+    // Check if consecutive weeks
+    const [y1,w1]=sortedWeeks[i-1].split("W").map(Number);
+    const [y2,w2]=sortedWeeks[i].split("W").map(Number);
+    const diff=(y1*53+w1)-(y2*53+w2);
+    if(diff===1){cur++;best=Math.max(best,cur);}
+    else cur=1;
+  }
+  return best;
 }
 function getTrend(history,exId){
   const pts=[];
@@ -561,8 +592,8 @@ function render(){
 
   if(!STATE.drawer){
     document.getElementById("root").innerHTML=`
-      <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:80px">${content}</div>
-      <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100">
+      <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:calc(80px + env(safe-area-inset-bottom))">${content}</div>
+      <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)">
         ${tabs.map(t=>`<button onclick="setTab('${t.id}')" style="flex:1;padding:8px 0;background:none;border:none;color:${STATE.tab===t.id?"#00BFFF":"#556070"};display:flex;flex-direction:column;align-items:center;gap:1px;position:relative">
           ${t.badge?`<span style="position:absolute;top:6px;right:20%;width:7px;height:7px;background:#FF4444;border-radius:50%" class="pulse"></span>`:""}
           <span style="font-size:18px">${t.i}</span>
@@ -575,8 +606,8 @@ function render(){
     let dc=document.getElementById("drawer-container");
     if(!dc){
       document.getElementById("root").innerHTML=`
-        <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:80px">${content}</div>
-        <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100">
+        <div id="main-content" style="flex:1;overflow-y:auto;padding-bottom:calc(80px + env(safe-area-inset-bottom))">${content}</div>
+        <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0D1117;border-top:1px solid #1E2530;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)">
           ${tabs.map(t=>`<button onclick="setTab('${t.id}')" style="flex:1;padding:8px 0;background:none;border:none;color:${STATE.tab===t.id?"#00BFFF":"#556070"};display:flex;flex-direction:column;align-items:center;gap:1px;position:relative">
             <span style="font-size:18px">${t.i}</span>
             <span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${t.l}</span>
@@ -606,13 +637,22 @@ function renderDrawerOnly(){
 // ═══════════════════════════════════════════════════════════════════════════════
 function renderDashboard(){
   const prs=getPRs(STATE.workoutHistory);
-  const streak=getStreak(STATE.workoutHistory);
+  const streakObj=getStreak(STATE.workoutHistory);
   const now=new Date(),thisWeek=STATE.workoutHistory.filter(h=>(now-new Date(h.date))/86400000<=7).length;
-  const topPRs=Object.entries(prs).map(([exId,pr])=>({exId,...pr,name:ALL_EX.find(e=>e.id===exId)?.name||exId})).sort((a,b)=>b.vol-a.vol).slice(0,3);
+  const topPRs=Object.entries(prs).map(([exId,pr])=>{
+    const ex=ALL_EX.find(e=>e.id===exId)||STATE.customExercises.find(e=>e.__id===exId);
+    return{exId,...pr,name:ex?.name||exId};
+  }).sort((a,b)=>b.vol-a.vol).slice(0,3);
   let html=`<div style="padding:16px">
   <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:14px;text-transform:uppercase"><span style="color:#00BFFF">Panelim</span></h1>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">
-    ${[{l:"Seri",v:streak,u:"gün",c:"#FFD700",i:"🔥"},{l:"Bu Hafta",v:thisWeek,u:"seans",c:"#39FF14",i:"📅"},{l:"Toplam",v:STATE.workoutHistory.length,u:"antrenman",c:"#00BFFF",i:"💪"}].map(s=>`
+    <div style="background:#0D1117;border:1px solid #FFD70030;border-radius:10px;padding:12px 8px;text-align:center">
+      <div style="font-size:22px;margin-bottom:2px">🔥</div>
+      <div style="font-size:28px;font-weight:900;color:#FFD700;line-height:1">${streakObj.current}</div>
+      <div style="font-size:9px;color:#FFD70099;letter-spacing:1px;text-transform:uppercase;margin-top:2px">haftalık seri</div>
+      <div style="font-size:9px;color:#556070;margin-top:3px">Rekor: ${streakObj.best} hafta</div>
+    </div>
+    ${[{l:"Bu Hafta",v:thisWeek,u:"seans",c:"#39FF14",i:"📅"},{l:"Toplam",v:STATE.workoutHistory.length,u:"antrenman",c:"#00BFFF",i:"💪"}].map(s=>`
     <div style="background:#0D1117;border:1px solid ${s.c}30;border-radius:10px;padding:12px 8px;text-align:center">
       <div style="font-size:22px;margin-bottom:4px">${s.i}</div>
       <div style="font-size:28px;font-weight:900;color:${s.c};line-height:1">${s.v}</div>
@@ -680,16 +720,17 @@ function renderWorkout(){
         </div>
       </div>
       <div style="padding:7px 13px">
-        <div style="display:grid;grid-template-columns:24px 1fr 65px 65px 34px;gap:3px;margin-bottom:3px">
-          ${["SET","ÖNCEKİ","KG","TEKRAR",""].map(h=>`<div style="font-size:8px;color:#556070;letter-spacing:1px;text-align:center;font-weight:700">${h}</div>`).join("")}
+        <div style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px">
+          ${["SET","ÖNCEKİ","KG","TEKRAR","",""].map(h=>`<div style="font-size:8px;color:#556070;letter-spacing:1px;text-align:center;font-weight:700">${h}</div>`).join("")}
         </div>
         ${ex.sets.map((set,si)=>`
-          <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:24px 1fr 65px 65px 34px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
+          <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
             <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
             <div style="font-size:11px;color:#556070;text-align:center">${set.prevW?set.prevW+"×"+set.prevR:"—"}</div>
-            <input class="sr-input" type="number" value="${set.weight}" oninput="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
-            <input class="sr-input" type="number" value="${set.reps}" oninput="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
-            <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:15px;height:30px;display:flex;align-items:center;justify-content:center;width:34px">${set.done?"✓":"○"}</button>
+            <input class="sr-input" type="number" value="${set.weight}" onchange="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
+            <input class="sr-input" type="number" value="${set.reps}" onchange="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
+            <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
+            <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
           </div>`).join("")}
         <button onclick="addSet(${ei})" style="margin-top:5px;background:none;border:1px dashed ${mc}40;border-radius:5px;color:${mc};font-size:11px;font-weight:700;padding:5px 0;width:100%;text-transform:uppercase">+ Set Ekle</button>
       </div>
@@ -724,7 +765,12 @@ function renderHistory(){
           <button onclick="deleteWorkout('${s.__id}')" style="background:#1A0808;border:1px solid #FF444440;border-radius:8px;color:#FF6B6B;font-size:12px;font-weight:700;padding:6px 10px;flex-shrink:0">🗑</button>
         </div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">${exIds.map(eid=>{const ex=ALL_EX.find(e=>e.id===eid),mc=MC[ex?.muscle]||"#00BFFF";return pill((ex?.name||eid)+(sePRs.includes(eid)?" 🏆":""),mc);}).join("")}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${exIds.map(eid=>{
+        const ex=ALL_EX.find(e=>e.id===eid)||STATE.customExercises.find(e=>e.__id===eid);
+        const mc=MC[ex?.muscle]||"#BB86FC";
+        const name=ex?.name||eid;
+        return pill(name+(sePRs.includes(eid)?" 🏆":""),mc);
+      }).join("")}</div>
     </div>`;
   });
   return html+`</div>`;
@@ -793,8 +839,8 @@ function renderProgress(){
   html+=`</div><div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Egzersiz Trendleri — ${rangeLabels[range]}</div>`;
 
   let hasAny = false;
-  ALL_EX.forEach(ex=>{
-    const trend=getTrendByRange(STATE.workoutHistory,ex.id,range),pr=prs[ex.id],mc=MC[ex.muscle]||"#00BFFF";
+  [...ALL_EX,...STATE.customExercises.map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10}))].forEach(ex=>{
+    const trend=getTrendByRange(STATE.workoutHistory,ex.id,range),pr=prs[ex.id],mc=MC[ex.muscle]||"#BB86FC";
     if(!trend.length) return;
     hasAny = true;
     html+=`<div style="background:#0D1117;border:1px solid ${mc}20;border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -891,7 +937,7 @@ function renderDrawer(){
         <button onclick="setDD({mode:'list'})" style="flex:1;background:${mode==="list"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="list"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Listeden Seç</button>
         <button onclick="setDD({mode:'custom'})" style="flex:1;background:${mode==="custom"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="custom"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Özel Ekle</button>
       </div>
-      ${mode==="list"?ALL_EX.map(ex=>{const mc=MC[ex.muscle]||"#00BFFF";return`<button onclick="addExercise('${ex.id}')" style="width:100%;background:#141820;border:1px solid ${mc}20;border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0"><span style="font-size:14px;font-weight:700;text-transform:uppercase">${ex.name}</span><span style="font-size:9px;color:${mc};font-weight:700;background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></button>`;}).join(""):`
+      ${mode==="list"?[...ALL_EX,...STATE.customExercises.map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10}))].map(ex=>{const mc=MC[ex.muscle]||"#BB86FC";return`<button onclick="addExercise('${ex.id}')" style="width:100%;background:#141820;border:1px solid ${mc}20;border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0"><span style="font-size:14px;font-weight:700;text-transform:uppercase">${ex.name}</span><span style="font-size:9px;color:${mc};font-weight:700;background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></button>`;}).join(""):`
         <div style="display:flex;flex-direction:column;gap:10px">
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Egzersiz Adı</div>
           <input id="drawer-custom-name" class="fi" placeholder="örn. Smith Machine" value="${d.customName||""}" oninput="updateDrawerField('customName',this.value)"/></div>
@@ -1042,7 +1088,17 @@ function startWorkout(dayName){
   const last=[...STATE.workoutHistory].reverse().find(h=>h.day===dayName);
   const exercises=plan.exercises.map(ex=>{
     const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
-    return{...ex,sets:Array.from({length:ex.ds},(_,i)=>({setNum:i+1,weight:ls[i]?.weight||"",reps:ls[i]?.reps||ex.dr,done:false,prevW:ls[i]?.weight||null,prevR:ls[i]?.reps||null}))};
+    // Önceki setin ağırlığını al; index yoksa son setin ağırlığını fallback olarak kullan
+    const lastW = ls.length>0 ? ls[ls.length-1].weight : null;
+    const lastR = ls.length>0 ? ls[ls.length-1].reps   : null;
+    return{...ex,sets:Array.from({length:ex.ds},(_,i)=>({
+      setNum:i+1,
+      weight: String(ls[i]?.weight ?? lastW ?? ""),
+      reps:   ls[i]?.reps ?? lastR ?? ex.dr,
+      done:false,
+      prevW: ls[i]?.weight ?? lastW ?? null,
+      prevR: ls[i]?.reps   ?? lastR ?? null,
+    }))};
   });
   const aw={dayName,exercises,startDate:todayStr()};
   STATE.activeWorkout=aw; STATE.workoutRunning=true; STATE.tab="workout";
@@ -1063,6 +1119,14 @@ function addSet(ei){
   ex[ei]={...ex[ei],sets:[...ex[ei].sets,{setNum:ex[ei].sets.length+1,weight:last?.weight||"",reps:last?.reps||10,done:false,prevW:null,prevR:null}]};
   STATE.activeWorkout={...aw,exercises:ex}; saveAW(STATE.activeWorkout); render();
 }
+function delSet(ei,si){
+  const aw=STATE.activeWorkout; if(!aw) return;
+  if(aw.exercises[ei].sets.length<=1) return; // en az 1 set kalsın
+  const ex=[...aw.exercises];
+  const sets=ex[ei].sets.filter((_,i)=>i!==si).map((s,i)=>({...s,setNum:i+1}));
+  ex[ei]={...ex[ei],sets};
+  STATE.activeWorkout={...aw,exercises:ex}; saveAW(STATE.activeWorkout); render();
+}
 function removeEx(ei){
   const aw=STATE.activeWorkout; if(!aw) return;
   STATE.activeWorkout={...aw,exercises:aw.exercises.filter((_,i)=>i!==ei)};
@@ -1070,14 +1134,43 @@ function removeEx(ei){
 }
 function openExPicker(){ STATE.drawer={type:"exPicker",mode:"list",customName:"",customMuscle:"Custom"}; render(); }
 function addExercise(exId){
-  const ex=ALL_EX.find(e=>e.id===exId); if(!ex||!STATE.activeWorkout) return;
-  STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+  let ex=ALL_EX.find(e=>e.id===exId);
+  if(!ex){
+    const ce=STATE.customExercises.find(e=>e.__id===exId);
+    if(ce) ex={id:ce.__id,name:ce.name,muscle:ce.muscle||"Custom",ds:ce.ds||3,dr:ce.dr||10};
+  }
+  if(!ex||!STATE.activeWorkout) return;
+  // Auto-fill from last workout
+  const last=[...STATE.workoutHistory].reverse().find(h=>h.day===STATE.activeWorkout.dayName);
+  const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
+  const lastW=ls.length>0?ls[ls.length-1].weight:null;
+  const lastR=ls.length>0?ls[ls.length-1].reps:null;
+  const sets=Array.from({length:ex.ds||3},(_,i)=>({
+    setNum:i+1,
+    weight:String(ls[i]?.weight??lastW??""),
+    reps:ls[i]?.reps??lastR??ex.dr??10,
+    done:false,
+    prevW:ls[i]?.weight??lastW??null,
+    prevR:ls[i]?.reps??lastR??null,
+  }));
+  STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets}]};
   saveAW(STATE.activeWorkout); STATE.drawer=null; render();
 }
-function addCustomEx(){
+async function addCustomEx(){
   const d=STATE.drawer; if(!d||!d.customName?.trim()||!STATE.activeWorkout) return;
-  const ex={id:"c"+Date.now(),name:d.customName.trim(),muscle:d.customMuscle||"Custom",ds:3,dr:10};
-  STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:10,done:false,prevW:null,prevR:null}]}]};
+  const exData={name:d.customName.trim(),muscle:d.customMuscle||"Custom",ds:3,dr:10};
+  // Save to Firebase so it persists
+  try{
+    const ref = await _db.collection("custom_exercises").add(exData);
+    const saved={__id:ref.id,...exData};
+    STATE.customExercises=[...STATE.customExercises, saved];
+    const ex={id:ref.id,...exData};
+    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+  }catch(e){
+    // fallback if offline
+    const ex={id:"c"+Date.now(),...exData};
+    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+  }
   saveAW(STATE.activeWorkout); STATE.drawer=null; render();
 }
 

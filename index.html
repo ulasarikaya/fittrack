@@ -449,44 +449,57 @@ function getPRs(history){
   return prs;
 }
 function getWeekKey(dateStr){
-  const d=new Date(dateStr+"T12:00:00");
-  const jan1=new Date(d.getFullYear(),0,1);
-  const week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
-  return d.getFullYear()+"W"+String(week).padStart(2,"0");
+  // Returns "YYYY-WW" using Monday-based ISO weeks
+  const d = new Date(dateStr + "T12:00:00");
+  const tmp = new Date(d);
+  tmp.setHours(0,0,0,0);
+  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay()||7)); // Thursday of the week
+  const yearStart = new Date(tmp.getFullYear(), 0, 1);
+  const weekNo = Math.ceil(((tmp - yearStart) / 86400000 + 1) / 7);
+  return tmp.getFullYear() + "-" + String(weekNo).padStart(2,"0");
 }
+
 function getStreak(history){
   if(!history.length) return {current:0, best:0};
-  // Get unique weeks with workouts
-  const weeks=[...new Set(history.map(h=>getWeekKey(h.date)))].sort().reverse();
-  const currentWeek=getWeekKey(new Date().toISOString().split("T")[0]);
-  const lastWeek=getWeekKey(new Date(Date.now()-7*86400000).toISOString().split("T")[0]);
-  // Streak counts if current or last week has workout
-  if(!weeks.includes(currentWeek)&&!weeks.includes(lastWeek)) return {current:0, best:calcBestStreak(weeks)};
-  // Count consecutive weeks back from now
-  let streak=0;
-  let chkDate=new Date();
-  for(let i=0;i<200;i++){
-    const wk=getWeekKey(chkDate.toISOString().split("T")[0]);
-    if(weeks.includes(wk)) streak++;
-    else if(i>7) break; // allow current week gap
-    chkDate.setDate(chkDate.getDate()-7);
-    if(streak>0&&!weeks.includes(wk)) break;
+
+  // Get all unique weeks that have at least 1 workout
+  const weekSet = new Set(history.map(h => getWeekKey(h.date)));
+  const weeks = [...weekSet].sort(); // ascending
+
+  // Best streak: max consecutive weeks
+  let best = 1, cur = 1;
+  for(let i = 1; i < weeks.length; i++){
+    const [y1,w1] = weeks[i-1].split("-").map(Number);
+    const [y2,w2] = weeks[i].split("-").map(Number);
+    // Check if consecutive (handle year boundary)
+    const totalWeeks1 = y1 * 53 + w1;
+    const totalWeeks2 = y2 * 53 + w2;
+    if(totalWeeks2 - totalWeeks1 === 1){ cur++; best = Math.max(best, cur); }
+    else cur = 1;
   }
-  return {current:streak, best:Math.max(streak, calcBestStreak(weeks))};
-}
-function calcBestStreak(sortedWeeks){
-  if(!sortedWeeks.length) return 0;
-  let best=1,cur=1;
-  for(let i=1;i<sortedWeeks.length;i++){
-    // Check if consecutive weeks
-    const [y1,w1]=sortedWeeks[i-1].split("W").map(Number);
-    const [y2,w2]=sortedWeeks[i].split("W").map(Number);
-    const diff=(y1*53+w1)-(y2*53+w2);
-    if(diff===1){cur++;best=Math.max(best,cur);}
-    else cur=1;
+
+  // Current streak: count consecutive weeks backwards from today
+  const todayWk = getWeekKey(new Date().toISOString().split("T")[0]);
+  const lastWk  = getWeekKey(new Date(Date.now() - 7*86400000).toISOString().split("T")[0]);
+
+  // Start from current week if it has workout, else from last week
+  let startWk = weekSet.has(todayWk) ? todayWk : (weekSet.has(lastWk) ? lastWk : null);
+  if(!startWk) return {current:0, best};
+
+  let streak = 0;
+  let [cy, cw] = startWk.split("-").map(Number);
+  while(true){
+    const wk = cy + "-" + String(cw).padStart(2,"0");
+    if(weekSet.has(wk)){ streak++; }
+    else break;
+    // Go back one week
+    cw--;
+    if(cw < 1){ cy--; cw = 52; } // approximate, good enough
   }
-  return best;
+
+  return {current: streak, best: Math.max(streak, best)};
 }
+
 function getTrend(history,exId){
   const pts=[];
   history.forEach(s=>{
@@ -727,8 +740,8 @@ function renderWorkout(){
           <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
             <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
             <div style="font-size:11px;color:#556070;text-align:center">${set.prevW?set.prevW+"×"+set.prevR:"—"}</div>
-            <input class="sr-input" type="number" value="${set.weight}" onchange="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
-            <input class="sr-input" type="number" value="${set.reps}" onchange="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
+            <input class="sr-input" type="number" inputmode="decimal" step="0.5" value="${set.weight}" onchange="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
+            <input class="sr-input" type="number" inputmode="numeric" step="1" value="${set.reps}" onchange="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
             <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
             <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
           </div>`).join("")}
@@ -910,7 +923,7 @@ function renderNutrition(){
       <div style="padding:6px 13px">`;
     if(!items.length) html+=`<div style="color:#556070;font-size:12px;padding:6px 0;text-align:center">Henüz yemek eklenmedi</div>`;
     items.forEach((item,idx)=>{
-      const food=FOOD_DB.find(f=>f.id===item.id),n=calcN(item.id,item.g);
+      const food=FOOD_DB.find(f=>f.id===item.id)||STATE.customFoods.find(f=>f.__id===item.id),n=calcN(item.id,item.g);
       html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1A2530">
         <div style="flex:1"><div style="font-size:13px;font-weight:700">${food?.name||item.id}</div><div style="font-size:10px;color:#7A8898">${item.g}g</div></div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -973,7 +986,7 @@ function renderDrawer(){
             <button onclick="setDD({useUnit:true})" style="flex:1;background:${d.useUnit?'#00BFFF':'#1A2530'};border:none;border-radius:7px;color:${d.useUnit?'#000':'#A0B0C0'};font-size:12px;font-weight:700;padding:6px 0">${pending.unit_label} (adet)</button>
           </div>` : ''}
           <div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">${d.useUnit && pending.unit_g ? pending.unit_label+' sayısı' : 'Gramaj (g)'}</div>
-          <input id="drawer-grams" class="fi" type="number" value="${grams}" oninput="updateDrawerField('grams',this.value)" placeholder="${d.useUnit && pending.unit_g ? '1' : '100'}"/>
+          <input id="drawer-grams" class="fi" type="number" inputmode="decimal" step="0.5" value="${grams}" oninput="updateDrawerField('grams',this.value)" placeholder="${d.useUnit && pending.unit_g ? '1' : '100'}"/>
           ${d.useUnit && pending.unit_g ? `<div style="font-size:10px;color:#556070;margin-top:4px">= ${Math.round(parseFloat(grams||1)*pending.unit_g)} g</div>` : ''}
         </div>
         <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:10px;padding:11px 13px;margin-bottom:12px">
@@ -1020,20 +1033,20 @@ function renderDrawer(){
           <input id="cf-name" class="fi" placeholder="örn. Ev Yapımı Köfte" value="${cf_name}" oninput="updateDrawerField('cf_name',this.value)"/></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div><div style="font-size:10px;color:#00BFFF;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kalori (kcal)</div>
-            <input id="cf-kcal" class="fi" type="number" placeholder="0" value="${cf_kcal}" oninput="updateDrawerField('cf_kcal',this.value)"/></div>
+            <input id="cf-kcal" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_kcal}" oninput="updateDrawerField('cf_kcal',this.value)"/></div>
           <div><div style="font-size:10px;color:#FF6B6B;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Protein (g)</div>
-            <input id="cf-protein" class="fi" type="number" placeholder="0" value="${cf_protein}" oninput="updateDrawerField('cf_protein',this.value)"/></div>
+            <input id="cf-protein" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_protein}" oninput="updateDrawerField('cf_protein',this.value)"/></div>
           <div><div style="font-size:10px;color:#BB86FC;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Karbonhidrat (g)</div>
-            <input id="cf-carb" class="fi" type="number" placeholder="0" value="${cf_carb}" oninput="updateDrawerField('cf_carb',this.value)"/></div>
+            <input id="cf-carb" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_carb}" oninput="updateDrawerField('cf_carb',this.value)"/></div>
           <div><div style="font-size:10px;color:#FFD700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Yağ (g)</div>
-            <input id="cf-fat" class="fi" type="number" placeholder="0" value="${cf_fat}" oninput="updateDrawerField('cf_fat',this.value)"/></div>
+            <input id="cf-fat" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_fat}" oninput="updateDrawerField('cf_fat',this.value)"/></div>
         </div>
         <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:8px;padding:8px 12px;font-size:11px;color:#7A8898">
           📌 Değerler <strong style="color:#E8ECF0">100g başına</strong> girilmeli. Sonra gramaj belirtirsin.
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Gramaj (g)</div>
-            <input id="cf-grams" class="fi" type="number" placeholder="100" value="${grams}" oninput="updateDrawerField('grams',this.value)"/></div>
+            <input id="cf-grams" class="fi" type="number" inputmode="decimal" step="0.5" placeholder="100" value="${grams}" oninput="updateDrawerField('grams',this.value)"/></div>
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kategori</div>
             <input id="cf-cat" class="fi" placeholder="Özel" value="${cf_cat}" oninput="updateDrawerField('cf_cat',this.value)"/></div>
         </div>

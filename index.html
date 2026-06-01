@@ -740,8 +740,8 @@ function renderWorkout(){
           <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
             <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
             <div style="font-size:11px;color:#556070;text-align:center">${set.prevW?set.prevW+"×"+set.prevR:"—"}</div>
-            <input class="sr-input" type="number" inputmode="decimal" step="0.5" value="${set.weight}" onchange="updSet(${ei},${si},'weight',this.value)" placeholder="0"/>
-            <input class="sr-input" type="number" inputmode="numeric" step="1" value="${set.reps}" onchange="updSet(${ei},${si},'reps',this.value)" placeholder="0"/>
+            <input class="sr-input" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${set.weight}" onchange="updSet(${ei},${si},'weight',parseFloat(this.value.replace(',','.'))||0)" placeholder="0"/>
+            <input class="sr-input" type="text" inputmode="numeric" pattern="[0-9]*" value="${set.reps}" onchange="updSet(${ei},${si},'reps',parseInt(this.value)||0)" placeholder="0"/>
             <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
             <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
           </div>`).join("")}
@@ -986,7 +986,7 @@ function renderDrawer(){
             <button onclick="setDD({useUnit:true})" style="flex:1;background:${d.useUnit?'#00BFFF':'#1A2530'};border:none;border-radius:7px;color:${d.useUnit?'#000':'#A0B0C0'};font-size:12px;font-weight:700;padding:6px 0">${pending.unit_label} (adet)</button>
           </div>` : ''}
           <div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">${d.useUnit && pending.unit_g ? pending.unit_label+' sayısı' : 'Gramaj (g)'}</div>
-          <input id="drawer-grams" class="fi" type="number" inputmode="decimal" step="0.5" value="${grams}" oninput="updateDrawerField('grams',this.value)" placeholder="${d.useUnit && pending.unit_g ? '1' : '100'}"/>
+          <input id="drawer-grams" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${grams}" oninput="updateDrawerField('grams',this.value)" placeholder="${d.useUnit && pending.unit_g ? '1' : '100'}"/>
           ${d.useUnit && pending.unit_g ? `<div style="font-size:10px;color:#556070;margin-top:4px">= ${Math.round(parseFloat(grams||1)*pending.unit_g)} g</div>` : ''}
         </div>
         <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:10px;padding:11px 13px;margin-bottom:12px">
@@ -1033,20 +1033,20 @@ function renderDrawer(){
           <input id="cf-name" class="fi" placeholder="örn. Ev Yapımı Köfte" value="${cf_name}" oninput="updateDrawerField('cf_name',this.value)"/></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div><div style="font-size:10px;color:#00BFFF;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kalori (kcal)</div>
-            <input id="cf-kcal" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_kcal}" oninput="updateDrawerField('cf_kcal',this.value)"/></div>
+            <input id="cf-kcal" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0" value="${cf_kcal}" oninput="updateDrawerField('cf_kcal',this.value)"/></div>
           <div><div style="font-size:10px;color:#FF6B6B;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Protein (g)</div>
-            <input id="cf-protein" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_protein}" oninput="updateDrawerField('cf_protein',this.value)"/></div>
+            <input id="cf-protein" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0" value="${cf_protein}" oninput="updateDrawerField('cf_protein',this.value)"/></div>
           <div><div style="font-size:10px;color:#BB86FC;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Karbonhidrat (g)</div>
-            <input id="cf-carb" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_carb}" oninput="updateDrawerField('cf_carb',this.value)"/></div>
+            <input id="cf-carb" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0" value="${cf_carb}" oninput="updateDrawerField('cf_carb',this.value)"/></div>
           <div><div style="font-size:10px;color:#FFD700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Yağ (g)</div>
-            <input id="cf-fat" class="fi" type="number" inputmode="decimal" step="0.1" placeholder="0" value="${cf_fat}" oninput="updateDrawerField('cf_fat',this.value)"/></div>
+            <input id="cf-fat" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0" value="${cf_fat}" oninput="updateDrawerField('cf_fat',this.value)"/></div>
         </div>
         <div style="background:#0A1520;border:1px solid #00BFFF18;border-radius:8px;padding:8px 12px;font-size:11px;color:#7A8898">
           📌 Değerler <strong style="color:#E8ECF0">100g başına</strong> girilmeli. Sonra gramaj belirtirsin.
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Gramaj (g)</div>
-            <input id="cf-grams" class="fi" type="number" inputmode="decimal" step="0.5" placeholder="100" value="${grams}" oninput="updateDrawerField('grams',this.value)"/></div>
+            <input id="cf-grams" class="fi" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="100" value="${grams}" oninput="updateDrawerField('grams',this.value)"/></div>
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kategori</div>
             <input id="cf-cat" class="fi" placeholder="Özel" value="${cf_cat}" oninput="updateDrawerField('cf_cat',this.value)"/></div>
         </div>
@@ -1253,7 +1253,7 @@ async function confirmFood(){
   const date=todayStr();
   const emptyM={"Kahvaltı":[],"Ara Öğün":[],"Akşam Yemeği":[]};
   const dayM=STATE.nutritionLog[date]||emptyM;
-  const finalGrams = d.useUnit && d.pending.unit_g ? Math.round((parseFloat(d.grams)||1)*d.pending.unit_g) : parseFloat(d.grams)||100;
+  const finalGrams = d.useUnit && d.pending.unit_g ? Math.round((parseFloat(String(d.grams).replace(",","."))||1)*d.pending.unit_g) : parseFloat(String(d.grams).replace(",","."))||100;
   const updated={...dayM,[d.mealType]:[...(dayM[d.mealType]||[]),{id:d.pending.id,g:finalGrams}]};
   STATE.drawer=null; await saveNutritionDB(date,updated);
 }

@@ -1169,50 +1169,49 @@ async function loadLeaderboardData(){
   }finally{
     clearTimeout(timeout);
     LEADERBOARD_LOADING = false;
-    render();
+    try{ render(); }catch(e){ console.error("render error after leaderboard load:",e); }
   }
 }
 
 function renderLeaderboard(){
-  // Auto-load on first visit
+  if(LEADERBOARD_LOADING) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div><div style="margin-top:12px"><button onclick="LEADERBOARD_LOADING=false;render()" style="background:#1A2530;border:1px solid #2A3040;border-radius:8px;color:#7A8898;font-size:11px;font-weight:700;padding:6px 12px">İptal</button></div></div>`;
   if(Object.keys(LEADERBOARD_DATA).length===0 && !LEADERBOARD_LOADING){
     loadLeaderboardData();
     return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
   }
-  if(LEADERBOARD_LOADING) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
   if(Object.keys(LEADERBOARD_DATA).length===0) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;margin:12px 0">Yüklenemedi</div><button onclick="loadLeaderboardData()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:900;padding:12px 24px;text-transform:uppercase">Tekrar Dene</button></div>`;
 
+  try{
   const users = Object.values(LEADERBOARD_DATA);
   if(!users.length) return`<div style="padding:32px;text-align:center;color:#556070">Veri yok</div>`;
 
   // Compute stats per user
   const stats = users.map(u=>{
-    const h = u.workoutHistory || [];
+    try{
+    const h = (u.workoutHistory||[]).map(w=>({...w,sets:(w.sets||[])}));
     const prs = getPRs(h);
-    const streakObj = getStreak(h);
-    // This week
+    const streakObj = getStreak(h)||{current:0,best:0};
     const _now=new Date(),_day=_now.getDay()||7;
     const _mon=new Date(_now); _mon.setHours(0,0,0,0); _mon.setDate(_now.getDate()-(_day-1));
-    const thisWeekCount = h.filter(w=>new Date(w.date+"T00:00:00")>=_mon).length;
-    // Total volume all time
+    const thisWeekCount = h.filter(w=>{ try{return new Date(w.date+"T00:00:00")>=_mon;}catch(e){return false;} }).length;
     const totalVol = h.reduce((acc,s)=>{
-      return acc+(s.sets||[]).reduce((a,set)=>a+set.weight*set.reps,0);
+      return acc+(s.sets||[]).reduce((a,set)=>a+((set.weight||0)*(set.reps||0)),0);
     },0);
-    // Top PRs by volume
     const topPRs = Object.entries(prs)
       .map(([exId,pr])=>({exId,...pr,name:ALL_EX.find(e=>e.id===exId)?.name||exId}))
       .sort((a,b)=>b.vol-a.vol).slice(0,5);
     return {
-      username: u.username,
-      displayName: u.displayName,
+      username: u.username||"",
+      displayName: u.displayName||u.username||"",
       totalWorkouts: h.length,
       thisWeek: thisWeekCount,
-      streak: streakObj.current,
-      bestStreak: streakObj.best,
+      streak: streakObj.current||0,
+      bestStreak: streakObj.best||0,
       totalVol: Math.round(totalVol),
       topPRs,
       isSelf: u.username === currentUser,
     };
+    }catch(e){ console.error("stat error for",u.username,e); return{username:u.username||"",displayName:u.displayName||"",totalWorkouts:0,thisWeek:0,streak:0,bestStreak:0,totalVol:0,topPRs:[],isSelf:false}; }
   });
 
   const MEDAL = ["🥇","🥈","🥉","4️⃣","5️⃣"];
@@ -1268,6 +1267,11 @@ function renderLeaderboard(){
     </div>`;
   }).join("");
 
+  }catch(e){
+    console.error("renderLeaderboard error:",e);
+    LEADERBOARD_DATA={};
+    return '<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px">⚠️</div><div style="font-size:14px;color:#FF6B6B;margin:12px 0">Hata: '+e.message+'</div><button onclick="loadLeaderboardData()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:900;padding:12px 24px;text-transform:uppercase">Tekrar Dene</button></div>';
+  }
   return`<div style="padding:16px;padding-bottom:100px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;text-transform:uppercase"><span style="color:#FFD700">Liderlik</span> Tablosu</h1>

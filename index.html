@@ -425,7 +425,7 @@ let STATE = {
   drawer:null,
   progressRange:"week",
   userProfile:null,      // {gender,age,height,weight,targetWeight,weeks,activity}
-  customTemplate:[],     // saved custom workout exercise list
+  customTemplates:{},    // {templateName: [exercises]} - multiple custom workouts
   showProfileForm:false, // onboarding / edit mode
 };
 
@@ -480,11 +480,12 @@ async function loadData(){
       STATE.userProfile = profSnap.exists ? profSnap.data() : null;
       STATE.showProfileForm = !STATE.userProfile;
     }catch(e){ STATE.userProfile=null; STATE.showProfileForm=true; }
-    // Load custom workout template
+    // Load all custom workout templates
     try{
-      const tmplSnap = await _db.collection("users").doc(currentUser).collection("custom_template").doc("default").get();
-      STATE.customTemplate = tmplSnap.exists ? (tmplSnap.data().exercises || []) : [];
-    }catch(e){ STATE.customTemplate=[]; }
+      const tmplSnap = await _db.collection("users").doc(currentUser).collection("custom_templates").get();
+      STATE.customTemplates = {};
+      tmplSnap.docs.forEach(d => { STATE.customTemplates[d.id] = d.data().exercises || []; });
+    }catch(e){ STATE.customTemplates={}; }
     STATE.loading = false;
     // Migrate old root-level data to user path (runs once, no reload needed)
     migrateOldData();
@@ -1646,19 +1647,18 @@ function toggleSec(id){
 }
 
 function startCustomWorkout(){
-  STATE.drawer = {type:"customWorkoutName", name:""};
+  STATE.drawer = {type:"customWorkoutPicker", newName:""};
   render();
 }
 
-function confirmCustomWorkoutName(){
-  const d = STATE.drawer;
-  const name = d?.name?.trim() || "Özel Antrenman";
+function startCustomFromTemplate(name){
   STATE.drawer = null;
-  // Pre-load exercises from saved template (empty sets)
-  const exercises = STATE.customTemplate.map(ex => {
-    // Auto-fill from last custom workout
-    const lastCustom = [...STATE.workoutHistory].reverse().find(h=>h.isCustom || h.day===name || h.day==="Özel Antrenman");
-    const ls = lastCustom ? (lastCustom.sets||[]).filter(s=>s.exId===ex.id) : [];
+  const tmplExercises = STATE.customTemplates[name] || [];
+  // Auto-fill from last workout with this name
+  const exercises = tmplExercises.map(ex => {
+    const lastW_hist = [...STATE.workoutHistory].reverse()
+      .find(h=>h.day===name && (h.sets||[]).some(s=>s.exId===ex.id));
+    const ls = lastW_hist ? (lastW_hist.sets||[]).filter(s=>s.exId===ex.id) : [];
     const lastW = ls.length>0 ? ls[ls.length-1].weight : null;
     const lastR = ls.length>0 ? ls[ls.length-1].reps : null;
     return {
@@ -1678,6 +1678,12 @@ function confirmCustomWorkoutName(){
   STATE.workoutRunning = true;
   STATE.tab = "workout";
   saveTS(Date.now()); saveAW(aw); startTimer(); render();
+}
+
+function confirmCustomWorkoutName(){
+  const d = STATE.drawer;
+  const name = (d?.newName||"").trim() || "Özel Antrenman";
+  startCustomFromTemplate(name);
 }
 
 function startWorkout(dayName){
@@ -1801,12 +1807,13 @@ async function finishWorkout(){
   const allSets=[];
   aw.exercises.forEach(ex=>ex.sets.filter(s=>s.done).forEach(s=>allSets.push({exId:ex.id,weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0})));
   const entry={day:aw.dayName,date:aw.startDate,duration:Math.round(STATE.elapsed/60),sets:allSets};
-  // Save custom workout template
+  // Save custom workout template per name
   if(aw.isCustom){
     const tmplExercises = aw.exercises.map(ex=>({id:ex.id,name:ex.name,muscle:ex.muscle,ds:ex.ds||3,dr:ex.dr||10}));
-    STATE.customTemplate = tmplExercises;
+    const tmplKey = aw.dayName;
+    STATE.customTemplates = {...STATE.customTemplates, [tmplKey]: tmplExercises};
     try{
-      await _db.collection("users").doc(currentUser).collection("custom_template").doc("default").set({exercises:tmplExercises});
+      await _db.collection("users").doc(currentUser).collection("custom_templates").doc(tmplKey).set({exercises:tmplExercises});
     }catch(e){ console.error("template save error:",e); }
   }
   stopTimer(); saveAW(null); saveTS(null);

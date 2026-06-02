@@ -398,49 +398,28 @@ async function loadData(){
 }
 
 async function migrateOldData(){
-  // Runs once for admin user - moves root-level data to users/{username}/
   const MIGRATED_KEY = "ft_migrated_v2";
-  if(localStorage.getItem(MIGRATED_KEY)) return; // already done
-  if(currentUser !== "ulasarikaya") return; // only for admin/first user
-
-  console.log("Migrating old data to user path...");
+  if(localStorage.getItem(MIGRATED_KEY)) return;
+  if(currentUser !== "ulasarikaya") { localStorage.setItem(MIGRATED_KEY,"1"); return; }
+  // Mark as done immediately to prevent re-running
+  localStorage.setItem(MIGRATED_KEY, "1");
+  console.log("Migrating old data...");
   try{
     const base = _db.collection("users").doc(currentUser);
-    const [oldW, oldN, oldCF, oldCE] = await Promise.all([
-      _db.collection("workouts").get(),
-      _db.collection("nutrition_logs").get(),
-      _db.collection("custom_foods").get(),
-      _db.collection("custom_exercises").get(),
-    ]);
-
-    // Migrate workouts
-    const wBatch = [];
-    oldW.docs.forEach(d => {
-      wBatch.push(base.collection("workouts").doc(d.id).set(d.data()));
-    });
-
-    // Migrate nutrition
-    const nBatch = [];
-    oldN.docs.forEach(d => {
-      nBatch.push(base.collection("nutrition_logs").doc(d.id).set(d.data()));
-    });
-
-    // Migrate custom foods
-    const cfBatch = [];
-    oldCF.docs.forEach(d => {
-      cfBatch.push(base.collection("custom_foods").doc(d.id).set(d.data()));
-    });
-
-    // Migrate custom exercises
-    const ceBatch = [];
-    oldCE.docs.forEach(d => {
-      ceBatch.push(base.collection("custom_exercises").doc(d.id).set(d.data()));
-    });
-
-    await Promise.all([...wBatch, ...nBatch, ...cfBatch, ...ceBatch]);
-    localStorage.setItem(MIGRATED_KEY, "1");
-    console.log(`Migrated: ${oldW.size} workouts, ${oldN.size} nutrition logs, ${oldCF.size} foods, ${oldCE.size} exercises`);
-    showToast("✓ Eski veriler aktarıldı!");
+    // Read old data sequentially to avoid overloading Firestore
+    const oldW  = await _db.collection("workouts").get();
+    const oldN  = await _db.collection("nutrition_logs").get();
+    const oldCF = await _db.collection("custom_foods").get();
+    const oldCE = await _db.collection("custom_exercises").get();
+    // Write sequentially too
+    for(const d of oldW.docs)  await base.collection("workouts").doc(d.id).set(d.data());
+    for(const d of oldN.docs)  await base.collection("nutrition_logs").doc(d.id).set(d.data());
+    for(const d of oldCF.docs) await base.collection("custom_foods").doc(d.id).set(d.data());
+    for(const d of oldCE.docs) await base.collection("custom_exercises").doc(d.id).set(d.data());
+    console.log("Migration done:", oldW.size, "workouts");
+    showToast("✓ Veriler aktarıldı, yenileniyor...");
+    // Reload data after migration
+    setTimeout(()=>loadData(), 1000);
   } catch(e){
     console.error("Migration error:", e);
   }
@@ -1159,28 +1138,36 @@ async function loadLeaderboardData(){
   if(LEADERBOARD_LOADING) return;
   LEADERBOARD_LOADING = true;
   render();
+  // 15 second safety timeout
+  const timeout = setTimeout(()=>{
+    LEADERBOARD_LOADING = false;
+    render();
+    showToast("⚠️ Zaman aşımı, tekrar dene");
+  }, 15000);
   try{
     const usernames = Object.keys(USERS);
-    // Add 10s timeout per user
-    const results = await Promise.all(usernames.map(async u=>{
+    // Load users one by one to avoid Firestore overload
+    const results = [];
+    for(const u of usernames){
       try{
         const wSnap = await _db.collection("users").doc(u).collection("workouts").orderBy("date","desc").get();
-        return {
+        results.push({
           username: u,
           displayName: USERS[u].displayName || u,
           workoutHistory: wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}))
-        };
+        });
       }catch(e){
         console.error("Error loading user",u,e);
-        return {username:u, displayName:USERS[u].displayName||u, workoutHistory:[]};
+        results.push({username:u, displayName:USERS[u].displayName||u, workoutHistory:[]});
       }
-    }));
+    }
     LEADERBOARD_DATA = {};
     results.forEach(r=>{ LEADERBOARD_DATA[r.username]=r; });
   }catch(e){
     console.error("leaderboard error:",e);
     showToast("⚠️ Liderlik tablosu yüklenemedi");
   }finally{
+    clearTimeout(timeout);
     LEADERBOARD_LOADING = false;
     render();
   }

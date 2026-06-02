@@ -481,13 +481,21 @@ function calcN(id,g){
   return{kcal:Math.round(f.p.kcal*r),protein:Math.round(f.p.protein*r*10)/10,carb:Math.round(f.p.carb*r*10)/10,fat:Math.round(f.p.fat*r*10)/10};
 }
 function getPRs(history){
+  if(!history||!Array.isArray(history)||!history.length) return {};
   const prs={};
-  history.forEach(s=>(s.sets||[]).forEach(set=>{
-    const v=set.weight*set.reps;
-    if(!prs[set.exId]||v>prs[set.exId].vol) prs[set.exId]={weight:set.weight,reps:set.reps,vol:v,date:s.date};
-  }));
+  try{
+    history.forEach(s=>{
+      if(!s) return;
+      (s.sets||[]).forEach(set=>{
+        if(!set||!set.exId) return;
+        const v=(set.weight||0)*(set.reps||0);
+        if(!prs[set.exId]||v>prs[set.exId].vol) prs[set.exId]={weight:set.weight||0,reps:set.reps||0,vol:v,date:s.date||""};
+      });
+    });
+  }catch(e){console.error("getPRs error:",e);}
   return prs;
 }
+
 function getWeekKey(dateStr){
   // Returns "YYYY-WW" using Monday-based ISO weeks
   const d = new Date(dateStr + "T12:00:00");
@@ -500,7 +508,7 @@ function getWeekKey(dateStr){
 }
 
 function getStreak(history){
-  if(!history.length) return {current:0, best:0};
+  if(!history || !history.length) return {current:0, best:0};
 
   // Get all unique weeks that have at least 1 workout
   const weekSet = new Set(history.map(h => getWeekKey(h.date)));
@@ -1190,7 +1198,7 @@ function renderLeaderboard(){
     try{
     const h = (u.workoutHistory||[]).map(w=>({...w,sets:(w.sets||[])}));
     const prs = getPRs(h);
-    const streakObj = getStreak(h)||{current:0,best:0};
+    const streakObj = getStreak(h||[])||{current:0,best:0};
     const _now=new Date(),_day=_now.getDay()||7;
     const _mon=new Date(_now); _mon.setHours(0,0,0,0); _mon.setDate(_now.getDate()-(_day-1));
     const thisWeekCount = h.filter(w=>{ try{return new Date(w.date+"T00:00:00")>=_mon;}catch(e){return false;} }).length;
@@ -1250,7 +1258,7 @@ function renderLeaderboard(){
     const name = ex?.name || exId;
     const mc = MC[ex?.muscle]||"#00BFFF";
     const userPRs = stats.map(u=>{
-      const prs = getPRs(u.workoutHistory);
+      const prs = getPRs(u.workoutHistory || []);
       return {displayName:u.displayName, pr:prs[exId]||null, isSelf:u.isSelf};
     }).filter(x=>x.pr).sort((a,b)=>b.pr.vol-a.pr.vol);
     if(!userPRs.length) return "";

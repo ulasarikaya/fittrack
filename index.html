@@ -526,6 +526,11 @@ async function migrateOldData(){
   const MIGRATED_KEY = "ft_migrated_v2";
   if(localStorage.getItem(MIGRATED_KEY)) return;
   if(currentUser !== "ulasarikaya") { localStorage.setItem(MIGRATED_KEY,"1"); return; }
+  // Only migrate if user has no workouts yet in new path
+  try{
+    const checkSnap = await _db.collection("users").doc(currentUser).collection("workouts").limit(1).get();
+    if(!checkSnap.empty){ localStorage.setItem(MIGRATED_KEY,"1"); return; } // already migrated
+  }catch(e){}
   // Mark as done immediately to prevent re-running
   localStorage.setItem(MIGRATED_KEY, "1");
   console.log("Migrating old data...");
@@ -1048,12 +1053,17 @@ function render(){
 }
 
 function renderDrawerOnly(){
-  const dc=document.getElementById("drawer-container"); if(!dc) return;
+  const dc=document.getElementById("drawer-container"); if(!dc){ render(); return; }
   const focused=document.activeElement;
   const fid=focused?focused.id:null;
   const ss=focused&&focused.tagName==="INPUT"?focused.selectionStart:null;
   const se=focused&&focused.tagName==="INPUT"?focused.selectionEnd:null;
-  dc.innerHTML=renderDrawer();
+  try{
+    dc.innerHTML=renderDrawer();
+  }catch(e){
+    console.error("renderDrawerOnly error:",e);
+    STATE.drawer=null; render(); return;
+  }
   if(fid){const el=document.getElementById(fid);if(el){el.focus();if(ss!==null)try{el.setSelectionRange(ss,se);}catch(e){}}}
   else{const si=document.getElementById("drawer-search");if(si){const l=si.value.length;si.focus();try{si.setSelectionRange(l,l);}catch(e){}}}
 }
@@ -1810,12 +1820,17 @@ async function addCustomEx(){
 }
 
 function renderDrawerOnly(){
-  const dc=document.getElementById("drawer-container"); if(!dc) return;
+  const dc=document.getElementById("drawer-container"); if(!dc){ render(); return; }
   const focused=document.activeElement;
   const fid=focused?focused.id:null;
   const ss=focused&&focused.tagName==="INPUT"?focused.selectionStart:null;
   const se=focused&&focused.tagName==="INPUT"?focused.selectionEnd:null;
-  dc.innerHTML=renderDrawer();
+  try{
+    dc.innerHTML=renderDrawer();
+  }catch(e){
+    console.error("renderDrawerOnly error:",e);
+    STATE.drawer=null; render(); return;
+  }
   if(fid){const el=document.getElementById(fid);if(el){el.focus();if(ss!==null)try{el.setSelectionRange(ss,se);}catch(e){}}}
   else{const si=document.getElementById("drawer-search");if(si){const l=si.value.length;si.focus();try{si.setSelectionRange(l,l);}catch(e){}}}
 }
@@ -1912,6 +1927,12 @@ async function loadSugg(mealType,idx){
 }
 
 // BOOT
+// Reset migration if it never completed properly (user has workouts in root but not in users/)
+if(authed && currentUser === "ulasarikaya"){
+  // Force re-check migration on each load - the check inside migrateOldData handles dedup
+  localStorage.removeItem("ft_migrated_v2");
+}
+
 render();
 if(authed && currentUser){
   try{

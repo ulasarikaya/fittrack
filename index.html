@@ -480,12 +480,19 @@ async function loadData(){
       STATE.userProfile = profSnap.exists ? profSnap.data() : null;
       STATE.showProfileForm = !STATE.userProfile;
     }catch(e){ STATE.userProfile=null; STATE.showProfileForm=true; }
-    // Load all custom workout templates
+    // Load all custom workout templates (localStorage first, then Firebase)
+    try{
+      const localTmpls = localStorage.getItem("ft_templates_"+currentUser);
+      if(localTmpls) STATE.customTemplates = JSON.parse(localTmpls);
+    }catch(e){}
     try{
       const tmplSnap = await _db.collection("users").doc(currentUser).collection("custom_templates").get();
-      STATE.customTemplates = {};
-      tmplSnap.docs.forEach(d => { STATE.customTemplates[d.id] = d.data().exercises || []; });
-    }catch(e){ STATE.customTemplates={}; }
+      if(tmplSnap.docs.length > 0){
+        tmplSnap.docs.forEach(d => { STATE.customTemplates[d.id] = d.data().exercises || []; });
+        // Sync back to localStorage
+        try{ localStorage.setItem("ft_templates_"+currentUser, JSON.stringify(STATE.customTemplates)); }catch(e){}
+      }
+    }catch(e){ console.error("templates load error:",e); }
     STATE.loading = false;
     // Migrate old root-level data to user path (runs once, no reload needed)
     migrateOldData();
@@ -1633,7 +1640,9 @@ function renderLeaderboard(){
 // ═══════════════════════════════════════════════════════════════════════════════
 function setTab(t){ STATE.tab=t; render(); }
 function logout(){
-  authed=false; currentUser=null;
+  authed=false;
+  if(currentUser) try{ localStorage.removeItem("ft_templates_"+currentUser); }catch(e){}
+  currentUser=null;
   localStorage.removeItem(AUTH_KEY); localStorage.removeItem(USER_KEY);
   STATE={tab:"dashboard",workoutHistory:[],nutritionLog:{},customFoods:[],customExercises:[],activeWorkout:null,workoutRunning:false,elapsed:0,loading:true,timerRef:null,autoSaveRef:null,drawer:null,progressRange:"week"};
   stopTimer(); saveAW(null); saveTS(null);
@@ -1812,6 +1821,9 @@ async function finishWorkout(){
     const tmplExercises = aw.exercises.map(ex=>({id:ex.id,name:ex.name,muscle:ex.muscle,ds:ex.ds||3,dr:ex.dr||10}));
     const tmplKey = aw.dayName;
     STATE.customTemplates = {...STATE.customTemplates, [tmplKey]: tmplExercises};
+    // Save to localStorage immediately (reliable)
+    try{ localStorage.setItem("ft_templates_"+currentUser, JSON.stringify(STATE.customTemplates)); }catch(e){}
+    // Also save to Firebase (async, best effort)
     try{
       await _db.collection("users").doc(currentUser).collection("custom_templates").doc(tmplKey).set({exercises:tmplExercises});
     }catch(e){ console.error("template save error:",e); }

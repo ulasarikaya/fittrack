@@ -425,6 +425,7 @@ let STATE = {
   drawer:null,
   progressRange:"week",
   userProfile:null,      // {gender,age,height,weight,targetWeight,weeks,activity}
+  customTemplate:[],     // saved custom workout exercise list
   showProfileForm:false, // onboarding / edit mode
 };
 
@@ -477,8 +478,13 @@ async function loadData(){
     try{
       const profSnap = await _db.collection("users").doc(currentUser).collection("profile").doc("data").get();
       STATE.userProfile = profSnap.exists ? profSnap.data() : null;
-      STATE.showProfileForm = !STATE.userProfile; // Show form if no profile
+      STATE.showProfileForm = !STATE.userProfile;
     }catch(e){ STATE.userProfile=null; STATE.showProfileForm=true; }
+    // Load custom workout template
+    try{
+      const tmplSnap = await _db.collection("users").doc(currentUser).collection("custom_template").doc("default").get();
+      STATE.customTemplate = tmplSnap.exists ? (tmplSnap.data().exercises || []) : [];
+    }catch(e){ STATE.customTemplate=[]; }
     STATE.loading = false;
     // Migrate old root-level data to user path (runs once, no reload needed)
     migrateOldData();
@@ -1187,9 +1193,18 @@ function renderHistory(){
 }
 
 function filterHistoryByRange(history, range){
+  if(!history || !Array.isArray(history)) return [];
   const now = new Date();
-  const days = {week:7, month:30, "3month":90, "6month":180, year:365, all:99999};
-  const d = days[range] || 7;
+  if(range === "week"){
+    // Pazartesi 00:00 - Pazar 23:59 (panel ile aynı mantık)
+    const day = now.getDay() || 7;
+    const monday = new Date(now);
+    monday.setHours(0,0,0,0);
+    monday.setDate(now.getDate() - (day - 1));
+    return history.filter(h => { try{ return new Date(h.date+"T00:00:00") >= monday; }catch(e){ return false; } });
+  }
+  const days = {month:30, "3month":90, "6month":180, year:365, all:99999};
+  const d = days[range] || 30;
   return history.filter(h => (now - new Date(h.date)) / 86400000 <= d);
 }
 
@@ -1639,7 +1654,26 @@ function confirmCustomWorkoutName(){
   const d = STATE.drawer;
   const name = d?.name?.trim() || "Özel Antrenman";
   STATE.drawer = null;
-  const aw = {dayName: name, exercises:[], startDate: todayStr(), isCustom: true};
+  // Pre-load exercises from saved template (empty sets)
+  const exercises = STATE.customTemplate.map(ex => {
+    // Auto-fill from last custom workout
+    const lastCustom = [...STATE.workoutHistory].reverse().find(h=>h.isCustom || h.day===name || h.day==="Özel Antrenman");
+    const ls = lastCustom ? (lastCustom.sets||[]).filter(s=>s.exId===ex.id) : [];
+    const lastW = ls.length>0 ? ls[ls.length-1].weight : null;
+    const lastR = ls.length>0 ? ls[ls.length-1].reps : null;
+    return {
+      ...ex,
+      sets: Array.from({length:ex.ds||3}, (_,i) => ({
+        setNum: i+1,
+        weight: String(ls[i]?.weight ?? lastW ?? ""),
+        reps:   ls[i]?.reps ?? lastR ?? (ex.dr||10),
+        done: false,
+        prevW: ls[i]?.weight ?? lastW ?? null,
+        prevR: ls[i]?.reps ?? lastR ?? null,
+      }))
+    };
+  });
+  const aw = {dayName:name, exercises, startDate:todayStr(), isCustom:true};
   STATE.activeWorkout = aw;
   STATE.workoutRunning = true;
   STATE.tab = "workout";
@@ -1767,6 +1801,14 @@ async function finishWorkout(){
   const allSets=[];
   aw.exercises.forEach(ex=>ex.sets.filter(s=>s.done).forEach(s=>allSets.push({exId:ex.id,weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0})));
   const entry={day:aw.dayName,date:aw.startDate,duration:Math.round(STATE.elapsed/60),sets:allSets};
+  // Save custom workout template
+  if(aw.isCustom){
+    const tmplExercises = aw.exercises.map(ex=>({id:ex.id,name:ex.name,muscle:ex.muscle,ds:ex.ds||3,dr:ex.dr||10}));
+    STATE.customTemplate = tmplExercises;
+    try{
+      await _db.collection("users").doc(currentUser).collection("custom_template").doc("default").set({exercises:tmplExercises});
+    }catch(e){ console.error("template save error:",e); }
+  }
   stopTimer(); saveAW(null); saveTS(null);
   STATE.activeWorkout=null; STATE.workoutRunning=false; STATE.tab="history";
   render(); await saveWorkoutDB(entry);

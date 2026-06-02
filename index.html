@@ -308,7 +308,6 @@ const MEAL_SUGG={
 // STATE
 // ═══════════════════════════════════════════════════════════════════════════════
 const AUTH_KEY = "ft_auth";
-let authed = !!(currentUser && localStorage.getItem(AUTH_KEY) === currentUser);
 
 // ── USERS (hardcoded, add new users here) ────────────────────────────────────
 const USERS = {
@@ -319,6 +318,7 @@ const USERS = {
 
 const USER_KEY = "ft_user";
 let currentUser = localStorage.getItem(USER_KEY) || null;
+let authed = !!(currentUser && localStorage.getItem(AUTH_KEY) === currentUser);
 
 let STATE = {
   tab:"dashboard",
@@ -686,7 +686,7 @@ function renderDashboard(){
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
     <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;text-transform:uppercase"><span style="color:#00BFFF">${uname}</span></h1>
     <button onclick="logout()" style="background:#1A1F28;border:1px solid #2A3040;border-radius:8px;color:#7A8898;font-size:11px;font-weight:700;padding:6px 12px;text-transform:uppercase">Çıkış</button>
-  </div>`;
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">
     <div style="background:#0D1117;border:1px solid #FFD70030;border-radius:10px;padding:12px 8px;text-align:center">
       <div style="font-size:22px;margin-bottom:2px">🔥</div>

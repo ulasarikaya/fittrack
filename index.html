@@ -382,11 +382,8 @@ async function loadData(){
     STATE.customFoods = cfSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.customExercises = ceSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.loading = false;
-    // Migrate old root-level data to user path (runs once)
-    migrateOldData().then(()=>{
-      // Reload after migration if needed
-      if(!localStorage.getItem("ft_migrated_v2") === false) loadData();
-    });
+    // Migrate old root-level data to user path (runs once, no reload needed)
+    migrateOldData();
     const savedAW = loadAW();
     if(savedAW){
       STATE.activeWorkout=savedAW; STATE.workoutRunning=true;
@@ -1159,22 +1156,34 @@ let LEADERBOARD_DATA = {}; // {username: {workoutHistory, displayName}}
 let LEADERBOARD_LOADING = false;
 
 async function loadLeaderboardData(){
+  if(LEADERBOARD_LOADING) return;
   LEADERBOARD_LOADING = true;
+  render();
   try{
     const usernames = Object.keys(USERS);
+    // Add 10s timeout per user
     const results = await Promise.all(usernames.map(async u=>{
-      const wSnap = await _db.collection("users").doc(u).collection("workouts").orderBy("date","desc").get();
-      return {
-        username: u,
-        displayName: USERS[u].displayName || u,
-        workoutHistory: wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}))
-      };
+      try{
+        const wSnap = await _db.collection("users").doc(u).collection("workouts").orderBy("date","desc").get();
+        return {
+          username: u,
+          displayName: USERS[u].displayName || u,
+          workoutHistory: wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}))
+        };
+      }catch(e){
+        console.error("Error loading user",u,e);
+        return {username:u, displayName:USERS[u].displayName||u, workoutHistory:[]};
+      }
     }));
     LEADERBOARD_DATA = {};
     results.forEach(r=>{ LEADERBOARD_DATA[r.username]=r; });
-  }catch(e){ console.error("leaderboard error:",e); }
-  LEADERBOARD_LOADING = false;
-  render();
+  }catch(e){
+    console.error("leaderboard error:",e);
+    showToast("⚠️ Liderlik tablosu yüklenemedi");
+  }finally{
+    LEADERBOARD_LOADING = false;
+    render();
+  }
 }
 
 function renderLeaderboard(){
@@ -1184,6 +1193,7 @@ function renderLeaderboard(){
     return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
   }
   if(LEADERBOARD_LOADING) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
+  if(Object.keys(LEADERBOARD_DATA).length===0) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;margin:12px 0">Yüklenemedi</div><button onclick="loadLeaderboardData()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:14px;font-weight:900;padding:12px 24px;text-transform:uppercase">Tekrar Dene</button></div>`;
 
   const users = Object.values(LEADERBOARD_DATA);
   if(!users.length) return`<div style="padding:32px;text-align:center;color:#556070">Veri yok</div>`;

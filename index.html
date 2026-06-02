@@ -497,11 +497,12 @@ function getPRs(history){
 }
 
 function getWeekKey(dateStr){
-  // Returns "YYYY-WW" using Monday-based ISO weeks
-  const d = new Date(dateStr + "T12:00:00");
+  if(!dateStr || typeof dateStr !== "string") return "1970-01";
+  const d = new Date(dateStr.slice(0,10) + "T12:00:00");
+  if(isNaN(d.getTime())) return "1970-01";
   const tmp = new Date(d);
   tmp.setHours(0,0,0,0);
-  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay()||7)); // Thursday of the week
+  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay()||7));
   const yearStart = new Date(tmp.getFullYear(), 0, 1);
   const weekNo = Math.ceil(((tmp - yearStart) / 86400000 + 1) / 7);
   return tmp.getFullYear() + "-" + String(weekNo).padStart(2,"0");
@@ -510,8 +511,12 @@ function getWeekKey(dateStr){
 function getStreak(history){
   if(!history || !history.length) return {current:0, best:0};
 
+  // Filter out entries without valid dates
+  const validHistory = history.filter(h => h && h.date && typeof h.date === "string" && h.date.length >= 8);
+  if(!validHistory.length) return {current:0, best:0};
+
   // Get all unique weeks that have at least 1 workout
-  const weekSet = new Set(history.map(h => getWeekKey(h.date)));
+  const weekSet = new Set(validHistory.map(h => getWeekKey(h.date)));
   const weeks = [...weekSet].sort(); // ascending
 
   // Best streak: max consecutive weeks
@@ -550,6 +555,7 @@ function getStreak(history){
 
 function getTrend(history,exId){
   const pts=[];
+  if(!history || !Array.isArray(history)) return pts;
   history.forEach(s=>{
     const best=(s.sets||[]).filter(x=>x.exId===exId).reduce((a,b)=>(!a||b.weight>a.weight)?b:a,null);
     if(best) pts.push({date:s.date,weight:best.weight});
@@ -557,9 +563,10 @@ function getTrend(history,exId){
   return pts;
 }
 function getWeekVol(history){
+  if(!history || !Array.isArray(history)) return {};
   const now=new Date(),ws=new Date(now); ws.setDate(now.getDate()-6);
   const vol={};
-  history.filter(h=>new Date(h.date)>=ws).forEach(s=>{
+  history.filter(h=>h&&h.date&&new Date(h.date)>=ws).forEach(s=>{
     (s.sets||[]).forEach(set=>{
       const ex=ALL_EX.find(e=>e.id===set.exId);
       if(ex) vol[ex.muscle]=(vol[ex.muscle]||0)+set.weight*set.reps;
@@ -1196,7 +1203,7 @@ function renderLeaderboard(){
   // Compute stats per user
   const stats = users.map(u=>{
     try{
-    const h = (u.workoutHistory||[]).map(w=>({...w,sets:(w.sets||[])}));
+    const h = (u.workoutHistory||[]).filter(w=>w&&w.date).map(w=>({...w,sets:(w.sets||[])}));
     const prs = getPRs(h);
     const streakObj = getStreak(h||[])||{current:0,best:0};
     const _now=new Date(),_day=_now.getDay()||7;

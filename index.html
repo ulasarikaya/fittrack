@@ -308,8 +308,17 @@ const MEAL_SUGG={
 // STATE
 // ═══════════════════════════════════════════════════════════════════════════════
 const AUTH_KEY = "ft_auth";
-const PASS = "061223";
-let authed = localStorage.getItem(AUTH_KEY) === "1";
+let authed = !!(currentUser && localStorage.getItem(AUTH_KEY) === currentUser);
+
+// ── USERS (hardcoded, add new users here) ────────────────────────────────────
+const USERS = {
+  "ulasarikaya": {password:"061223", displayName:"Ulaş", isAdmin:true},
+  // Yeni kullanıcı eklemek için:
+  // "username": {password:"sifre", displayName:"Ad Soyad", isAdmin:false},
+};
+
+const USER_KEY = "ft_user";
+let currentUser = localStorage.getItem(USER_KEY) || null;
 
 let STATE = {
   tab:"dashboard",
@@ -359,11 +368,12 @@ function elapsedFromTS(){ const ts=loadTS(); return ts?Math.floor((Date.now()-ts
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
   try{
+    const base = _db.collection("users").doc(currentUser);
     const [wSnap,nSnap,cfSnap,ceSnap] = await Promise.all([
-      _db.collection("workouts").orderBy("date","desc").get(),
-      _db.collection("nutrition_logs").get(),
-      _db.collection("custom_foods").get(),
-      _db.collection("custom_exercises").get()
+      base.collection("workouts").orderBy("date","desc").get(),
+      base.collection("nutrition_logs").get(),
+      base.collection("custom_foods").get(),
+      base.collection("custom_exercises").get()
     ]);
     STATE.workoutHistory = wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}));
     const log={};
@@ -387,7 +397,7 @@ async function loadData(){
 
 async function saveWorkoutDB(entry){
   try{
-    const ref = await _db.collection("workouts").add({day:entry.day,date:entry.date,duration:entry.duration,sets:entry.sets});
+    const ref = await _db.collection("users").doc(currentUser).collection("workouts").add({day:entry.day,date:entry.date,duration:entry.duration,sets:entry.sets});
     STATE.workoutHistory=[{__id:ref.id,...entry},...STATE.workoutHistory];
     render(); showToast("✓ Antrenman kaydedildi!");
   }catch(e){ console.error("save error:",e); showToast("⚠️ Kaydetme hatası!"); }
@@ -395,13 +405,13 @@ async function saveWorkoutDB(entry){
 
 async function saveNutritionDB(date,meals){
   STATE.nutritionLog={...STATE.nutritionLog,[date]:meals}; render();
-  try{ await _db.collection("nutrition_logs").doc(date).set({date,meals}); }
+  try{ await _db.collection("users").doc(currentUser).collection("nutrition_logs").doc(date).set({date,meals}); }
   catch(e){ console.error("nutrition error:",e); }
 }
 
 async function saveCustomFoodDB(food){
   try{
-    const ref = await _db.collection("custom_foods").add(food);
+    const ref = await _db.collection("users").doc(currentUser).collection("custom_foods").add(food);
     const newFood = {__id:ref.id,...food};
     STATE.customFoods = [...STATE.customFoods, newFood];
     showToast("✓ Besin kaydedildi!");
@@ -414,7 +424,7 @@ async function deleteWorkout(id){
   STATE.workoutHistory = STATE.workoutHistory.filter(w=>w.__id!==id);
   render();
   try{
-    await _db.collection("workouts").doc(id).delete();
+    await _db.collection("users").doc(currentUser).collection("workouts").doc(id).delete();
     showToast("✓ Antrenman silindi");
   }catch(e){
     console.error("delete error:",e);
@@ -557,24 +567,34 @@ function stopTimer(){
 // RENDER
 // ═══════════════════════════════════════════════════════════════════════════════
 function renderLogin(){
-  return `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:20px;padding:32px;background:#080B10">
+  return `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;padding:32px;background:#080B10">
     <div style="font-size:48px">⚡</div>
     <div style="font-size:28px;font-weight:900;color:#00BFFF;letter-spacing:2px;text-transform:uppercase">FitTrack Pro</div>
-    <div style="font-size:14px;color:#556070;margin-bottom:8px">Şifrenizi girin</div>
-    <input id="pass-input" type="password" placeholder="••••••"
-      style="background:#0D1117;border:1px solid #2A3040;color:#E8ECF0;border-radius:10px;padding:14px 20px;font-size:22px;text-align:center;letter-spacing:8px;outline:none;width:100%;max-width:240px"
-      onkeydown="if(event.key==='Enter') checkPass()"
-      oninput="document.getElementById('pass-err').style.display='none'"/>
-    <div id="pass-err" style="display:none;color:#FF6B6B;font-size:13px;font-weight:700">Yanlış şifre</div>
-    <button onclick="checkPass()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:16px;font-weight:900;padding:14px 40px;letter-spacing:1px;text-transform:uppercase">GİRİŞ →</button>
+    <div style="font-size:13px;color:#556070;margin-bottom:4px">Kullanıcı adı ve şifrenizi girin</div>
+    <div style="width:100%;max-width:280px;display:flex;flex-direction:column;gap:10px">
+      <input id="user-input" type="text" placeholder="Kullanıcı adı" autocomplete="username" autocapitalize="none"
+        style="background:#0D1117;border:1px solid #2A3040;color:#E8ECF0;border-radius:10px;padding:14px 18px;font-size:16px;outline:none;width:100%;font-family:inherit"
+        onkeydown="if(event.key==='Enter') document.getElementById('pass-input').focus()"
+        oninput="document.getElementById('pass-err').style.display='none'"/>
+      <input id="pass-input" type="password" placeholder="Şifre" autocomplete="current-password"
+        style="background:#0D1117;border:1px solid #2A3040;color:#E8ECF0;border-radius:10px;padding:14px 18px;font-size:16px;letter-spacing:4px;outline:none;width:100%;font-family:inherit"
+        onkeydown="if(event.key==='Enter') checkPass()"
+        oninput="document.getElementById('pass-err').style.display='none'"/>
+    </div>
+    <div id="pass-err" style="display:none;color:#FF6B6B;font-size:13px;font-weight:700">Kullanıcı adı veya şifre yanlış</div>
+    <button onclick="checkPass()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:16px;font-weight:900;padding:14px 60px;letter-spacing:1px;text-transform:uppercase;margin-top:4px">GİRİŞ →</button>
   </div>`;
 }
 
 function checkPass(){
-  const val = document.getElementById("pass-input").value;
-  if(val === PASS){
+  const username = (document.getElementById("user-input").value||"").trim().toLowerCase();
+  const pass = document.getElementById("pass-input").value;
+  const user = USERS[username];
+  if(user && user.password === pass){
     authed = true;
-    localStorage.setItem(AUTH_KEY, "1");
+    currentUser = username;
+    localStorage.setItem(AUTH_KEY, username);
+    localStorage.setItem(USER_KEY, username);
     render();
     initFirebase();
     loadData();
@@ -595,13 +615,14 @@ function render(){
     document.getElementById("root").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><div style="font-size:36px" class="pulse">⚡</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase">Yükleniyor...</div></div>`;
     return;
   }
-  const tabs=[{id:"dashboard",i:"⚡",l:"Panel"},{id:"workout",i:"🏋️",l:"Antrenman",badge:STATE.workoutRunning},{id:"history",i:"📋",l:"Geçmiş"},{id:"progress",i:"📈",l:"İlerleme"},{id:"nutrition",i:"🥗",l:"Beslenme"}];
+  const tabs=[{id:"dashboard",i:"⚡",l:"Panel"},{id:"workout",i:"🏋️",l:"Antrenman",badge:STATE.workoutRunning},{id:"history",i:"📋",l:"Geçmiş"},{id:"progress",i:"📈",l:"İlerleme"},{id:"nutrition",i:"🥗",l:"Beslenme"},{id:"leaderboard",i:"🏆",l:"Lider"}];
   let content="";
   if(STATE.tab==="dashboard") content=renderDashboard();
   else if(STATE.tab==="workout") content=renderWorkout();
   else if(STATE.tab==="history") content=renderHistory();
   else if(STATE.tab==="progress") content=renderProgress();
   else if(STATE.tab==="nutrition") content=renderNutrition();
+  else if(STATE.tab==="leaderboard") content=renderLeaderboard();
 
   if(!STATE.drawer){
     document.getElementById("root").innerHTML=`
@@ -651,13 +672,21 @@ function renderDrawerOnly(){
 function renderDashboard(){
   const prs=getPRs(STATE.workoutHistory);
   const streakObj=getStreak(STATE.workoutHistory);
-  const now=new Date(),thisWeek=STATE.workoutHistory.filter(h=>(now-new Date(h.date))/86400000<=7).length;
+  // "Bu Hafta" = Pazartesi 00:00 - Pazar 23:59 (ISO hafta)
+  const _now=new Date();
+  const _day=_now.getDay()||7; // 1=Pzt, 7=Paz
+  const _monday=new Date(_now); _monday.setHours(0,0,0,0); _monday.setDate(_now.getDate()-(_day-1));
+  const thisWeek=STATE.workoutHistory.filter(h=>new Date(h.date+"T00:00:00")>=_monday).length;
   const topPRs=Object.entries(prs).map(([exId,pr])=>{
     const ex=ALL_EX.find(e=>e.id===exId)||STATE.customExercises.find(e=>e.__id===exId);
     return{exId,...pr,name:ex?.name||exId};
   }).sort((a,b)=>b.vol-a.vol).slice(0,3);
+  const uname = USERS[currentUser]?.displayName || currentUser || 'Kullanıcı';
   let html=`<div style="padding:16px">
-  <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:14px;text-transform:uppercase"><span style="color:#00BFFF">Panelim</span></h1>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;text-transform:uppercase"><span style="color:#00BFFF">${uname}</span></h1>
+    <button onclick="logout()" style="background:#1A1F28;border:1px solid #2A3040;border-radius:8px;color:#7A8898;font-size:11px;font-weight:700;padding:6px 12px;text-transform:uppercase">Çıkış</button>
+  </div>`;
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">
     <div style="background:#0D1117;border:1px solid #FFD70030;border-radius:10px;padding:12px 8px;text-align:center">
       <div style="font-size:22px;margin-bottom:2px">🔥</div>
@@ -740,8 +769,8 @@ function renderWorkout(){
           <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
             <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
             <div style="font-size:11px;color:#556070;text-align:center">${set.prevW?set.prevW+"×"+set.prevR:"—"}</div>
-            <input class="sr-input" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${set.weight}" onchange="updSet(${ei},${si},'weight',parseFloat(this.value.replace(',','.'))||0)" placeholder="0"/>
-            <input class="sr-input" type="text" inputmode="numeric" pattern="[0-9]*" value="${set.reps}" onchange="updSet(${ei},${si},'reps',parseInt(this.value)||0)" placeholder="0"/>
+            <input class="sr-input" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${set.weight}" oninput="updSetSilent(${ei},${si},'weight',this.value)" placeholder="0"/>
+            <input class="sr-input" type="text" inputmode="numeric" pattern="[0-9]*" value="${set.reps}" oninput="updSetSilent(${ei},${si},'reps',this.value)" placeholder="0"/>
             <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
             <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
           </div>`).join("")}
@@ -1070,9 +1099,150 @@ function renderDrawer(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+let LEADERBOARD_DATA = {}; // {username: {workoutHistory, displayName}}
+let LEADERBOARD_LOADING = false;
+
+async function loadLeaderboardData(){
+  LEADERBOARD_LOADING = true;
+  try{
+    const usernames = Object.keys(USERS);
+    const results = await Promise.all(usernames.map(async u=>{
+      const wSnap = await _db.collection("users").doc(u).collection("workouts").orderBy("date","desc").get();
+      return {
+        username: u,
+        displayName: USERS[u].displayName || u,
+        workoutHistory: wSnap.docs.map(d=>({__id:d.id,...d.data(),sets:d.data().sets||[]}))
+      };
+    }));
+    LEADERBOARD_DATA = {};
+    results.forEach(r=>{ LEADERBOARD_DATA[r.username]=r; });
+  }catch(e){ console.error("leaderboard error:",e); }
+  LEADERBOARD_LOADING = false;
+  render();
+}
+
+function renderLeaderboard(){
+  // Auto-load on first visit
+  if(Object.keys(LEADERBOARD_DATA).length===0 && !LEADERBOARD_LOADING){
+    loadLeaderboardData();
+    return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
+  }
+  if(LEADERBOARD_LOADING) return`<div style="padding:32px;text-align:center;color:#556070"><div style="font-size:36px" class="pulse">🏆</div><div style="font-size:16px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-top:12px">Yükleniyor...</div></div>`;
+
+  const users = Object.values(LEADERBOARD_DATA);
+  if(!users.length) return`<div style="padding:32px;text-align:center;color:#556070">Veri yok</div>`;
+
+  // Compute stats per user
+  const stats = users.map(u=>{
+    const h = u.workoutHistory;
+    const prs = getPRs(h);
+    const streakObj = getStreak(h);
+    // This week
+    const _now=new Date(),_day=_now.getDay()||7;
+    const _mon=new Date(_now); _mon.setHours(0,0,0,0); _mon.setDate(_now.getDate()-(_day-1));
+    const thisWeekCount = h.filter(w=>new Date(w.date+"T00:00:00")>=_mon).length;
+    // Total volume all time
+    const totalVol = h.reduce((acc,s)=>{
+      return acc+(s.sets||[]).reduce((a,set)=>a+set.weight*set.reps,0);
+    },0);
+    // Top PRs by volume
+    const topPRs = Object.entries(prs)
+      .map(([exId,pr])=>({exId,...pr,name:ALL_EX.find(e=>e.id===exId)?.name||exId}))
+      .sort((a,b)=>b.vol-a.vol).slice(0,5);
+    return {
+      username: u.username,
+      displayName: u.displayName,
+      totalWorkouts: h.length,
+      thisWeek: thisWeekCount,
+      streak: streakObj.current,
+      bestStreak: streakObj.best,
+      totalVol: Math.round(totalVol),
+      topPRs,
+      isSelf: u.username === currentUser,
+    };
+  });
+
+  const MEDAL = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+
+  // Section renderer helper
+  const section = (title, icon, rows) => `
+    <div style="background:#0D1117;border:1px solid #1E2530;border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">${icon} ${title}</div>
+      ${rows}
+    </div>`;
+
+  const row = (medal,name,val,unit,isSelf) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1A2530">
+      <span style="font-size:18px;width:28px;text-align:center">${medal}</span>
+      <span style="flex:1;font-size:14px;font-weight:${isSelf?900:600};color:${isSelf?"#00BFFF":"#E8ECF0"};text-transform:uppercase">${name}${isSelf?" (sen)":""}</span>
+      <span style="font-size:14px;font-weight:900;color:${isSelf?"#00BFFF":"#E8ECF0"}">${val}<span style="font-size:10px;color:#7A8898;font-weight:400"> ${unit}</span></span>
+    </div>`;
+
+  // 1. Bu hafta antrenman
+  const byWeek = [...stats].sort((a,b)=>b.thisWeek-a.thisWeek);
+  const weekRows = byWeek.map((u,i)=>row(MEDAL[i]||"",""+u.displayName,u.thisWeek,"seans",u.isSelf)).join("");
+
+  // 2. Seri rekoru
+  const byStreak = [...stats].sort((a,b)=>b.bestStreak-a.bestStreak);
+  const streakRows = byStreak.map((u,i)=>row(MEDAL[i]||"",u.displayName,u.bestStreak,"hafta",u.isSelf)).join("");
+
+  // 3. Toplam hacim
+  const byVol = [...stats].sort((a,b)=>b.totalVol-a.totalVol);
+  const volRows = byVol.map((u,i)=>row(MEDAL[i]||"",u.displayName,u.totalVol.toLocaleString(),"kg·tekr",u.isSelf)).join("");
+
+  // 4. PR karşılaştırması (TOP 5 hareket - en yüksek PR'a göre sıralı)
+  // Collect all exercise IDs that appear in any user's PRs
+  const allExIds = [...new Set(stats.flatMap(u=>u.topPRs.map(p=>p.exId)))];
+  const prRows = allExIds.slice(0,5).map(exId=>{
+    const ex = ALL_EX.find(e=>e.id===exId);
+    const name = ex?.name || exId;
+    const mc = MC[ex?.muscle]||"#00BFFF";
+    const userPRs = stats.map(u=>{
+      const prs = getPRs(u.workoutHistory);
+      return {displayName:u.displayName, pr:prs[exId]||null, isSelf:u.isSelf};
+    }).filter(x=>x.pr).sort((a,b)=>b.pr.vol-a.pr.vol);
+    if(!userPRs.length) return "";
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="font-size:10px;font-weight:700;color:${mc};background:${mc}20;padding:2px 8px;border-radius:3px;text-transform:uppercase">${ex?.muscle||""}</span>
+        <span style="font-size:13px;font-weight:800;text-transform:uppercase">${name}</span>
+      </div>
+      ${userPRs.map((u,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1A2530">
+        <span style="font-size:14px;width:24px;text-align:center">${MEDAL[i]||""}</span>
+        <span style="flex:1;font-size:13px;font-weight:${u.isSelf?800:500};color:${u.isSelf?"#00BFFF":"#E8ECF0"};text-transform:uppercase">${u.displayName}${u.isSelf?" ✦":""}</span>
+        <span style="font-size:13px;font-weight:900;color:${u.isSelf?"#00BFFF":"#E8ECF0"}">${u.pr.weight}kg <span style="color:#556070;font-weight:400">×${u.pr.reps}</span></span>
+      </div>`).join("")}
+    </div>`;
+  }).join("");
+
+  return`<div style="padding:16px;padding-bottom:100px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;text-transform:uppercase"><span style="color:#FFD700">Liderlik</span> Tablosu</h1>
+    <button onclick="loadLeaderboardData()" style="background:#1A1F28;border:1px solid #2A3040;border-radius:8px;color:#7A8898;font-size:11px;font-weight:700;padding:6px 12px;text-transform:uppercase">🔄 Güncelle</button>
+  </div>
+  ${section("Bu Hafta Antrenmanlar","📅",weekRows)}
+  ${section("Seri Rekoru","🔥",streakRows)}
+  ${section("Toplam Hacim","⚡",volRows)}
+  <div style="background:#0D1117;border:1px solid #1E2530;border-radius:12px;padding:14px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">💪 PR Karşılaştırması (Top 5)</div>
+    ${prRows||'<div style="color:#556070;text-align:center;padding:16px;font-size:13px">Henüz PR kaydı yok</div>'}
+  </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ACTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 function setTab(t){ STATE.tab=t; render(); }
+function logout(){
+  authed=false; currentUser=null;
+  localStorage.removeItem(AUTH_KEY); localStorage.removeItem(USER_KEY);
+  STATE={tab:"dashboard",workoutHistory:[],nutritionLog:{},customFoods:[],customExercises:[],activeWorkout:null,workoutRunning:false,elapsed:0,loading:true,timerRef:null,autoSaveRef:null,drawer:null,progressRange:"week"};
+  stopTimer(); saveAW(null); saveTS(null);
+  render();
+}
 function setProgressRange(r){ STATE.progressRange=r; render(); }
 function toggleSec(id){
   const b=document.getElementById(id+"-body"),a=document.getElementById(id+"-arr");
@@ -1126,6 +1296,16 @@ function updSet(ei,si,field,value){
   STATE.activeWorkout={...aw,exercises:ex};
   saveAW(STATE.activeWorkout); render();
 }
+function updSetSilent(ei,si,field,rawVal){
+  // Updates weight/reps without re-rendering (preserves iOS keyboard focus)
+  const aw=STATE.activeWorkout; if(!aw) return;
+  const ex=[...aw.exercises],sets=[...ex[ei].sets];
+  // Accept comma as decimal separator (Turkish locale)
+  const val = typeof rawVal==="string" ? rawVal.replace(",",".") : rawVal;
+  sets[si]={...sets[si],[field]:val}; ex[ei]={...ex[ei],sets};
+  STATE.activeWorkout={...aw,exercises:ex};
+  saveAW(STATE.activeWorkout);
+}
 function addSet(ei){
   const aw=STATE.activeWorkout; if(!aw) return;
   const ex=[...aw.exercises],last=ex[ei].sets[ex[ei].sets.length-1];
@@ -1174,7 +1354,7 @@ async function addCustomEx(){
   const exData={name:d.customName.trim(),muscle:d.customMuscle||"Custom",ds:3,dr:10};
   // Save to Firebase so it persists
   try{
-    const ref = await _db.collection("custom_exercises").add(exData);
+    const ref = await _db.collection("users").doc(currentUser).collection("custom_exercises").add(exData);
     const saved={__id:ref.id,...exData};
     STATE.customExercises=[...STATE.customExercises, saved];
     const ex={id:ref.id,...exData};
@@ -1276,7 +1456,7 @@ async function loadSugg(mealType,idx){
 
 // BOOT
 render();
-if(authed){
+if(authed && currentUser){
   try{
     initFirebase();
     loadData();

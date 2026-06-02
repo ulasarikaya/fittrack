@@ -382,6 +382,11 @@ async function loadData(){
     STATE.customFoods = cfSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.customExercises = ceSnap.docs.map(d=>({__id:d.id,...d.data()}));
     STATE.loading = false;
+    // Migrate old root-level data to user path (runs once)
+    migrateOldData().then(()=>{
+      // Reload after migration if needed
+      if(!localStorage.getItem("ft_migrated_v2") === false) loadData();
+    });
     const savedAW = loadAW();
     if(savedAW){
       STATE.activeWorkout=savedAW; STATE.workoutRunning=true;
@@ -392,6 +397,55 @@ async function loadData(){
   }catch(e){
     console.error("loadData error:",e);
     STATE.loading=false; render();
+  }
+}
+
+async function migrateOldData(){
+  // Runs once for admin user - moves root-level data to users/{username}/
+  const MIGRATED_KEY = "ft_migrated_v2";
+  if(localStorage.getItem(MIGRATED_KEY)) return; // already done
+  if(currentUser !== "ulasarikaya") return; // only for admin/first user
+
+  console.log("Migrating old data to user path...");
+  try{
+    const base = _db.collection("users").doc(currentUser);
+    const [oldW, oldN, oldCF, oldCE] = await Promise.all([
+      _db.collection("workouts").get(),
+      _db.collection("nutrition_logs").get(),
+      _db.collection("custom_foods").get(),
+      _db.collection("custom_exercises").get(),
+    ]);
+
+    // Migrate workouts
+    const wBatch = [];
+    oldW.docs.forEach(d => {
+      wBatch.push(base.collection("workouts").doc(d.id).set(d.data()));
+    });
+
+    // Migrate nutrition
+    const nBatch = [];
+    oldN.docs.forEach(d => {
+      nBatch.push(base.collection("nutrition_logs").doc(d.id).set(d.data()));
+    });
+
+    // Migrate custom foods
+    const cfBatch = [];
+    oldCF.docs.forEach(d => {
+      cfBatch.push(base.collection("custom_foods").doc(d.id).set(d.data()));
+    });
+
+    // Migrate custom exercises
+    const ceBatch = [];
+    oldCE.docs.forEach(d => {
+      ceBatch.push(base.collection("custom_exercises").doc(d.id).set(d.data()));
+    });
+
+    await Promise.all([...wBatch, ...nBatch, ...cfBatch, ...ceBatch]);
+    localStorage.setItem(MIGRATED_KEY, "1");
+    console.log(`Migrated: ${oldW.size} workouts, ${oldN.size} nutrition logs, ${oldCF.size} foods, ${oldCE.size} exercises`);
+    showToast("✓ Eski veriler aktarıldı!");
+  } catch(e){
+    console.error("Migration error:", e);
   }
 }
 

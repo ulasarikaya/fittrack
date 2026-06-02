@@ -460,6 +460,17 @@ function elapsedFromTS(){ const ts=loadTS(); return ts?Math.floor((Date.now()-ts
 // DB FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
+  // 10 second timeout - if Firebase is slow, show app with empty data
+  const loadTimeout = setTimeout(()=>{
+    if(STATE.loading){
+      console.warn("loadData timeout - showing app with local data");
+      STATE.loading = false;
+      const savedAW = loadAW();
+      if(savedAW){ STATE.activeWorkout=savedAW; STATE.workoutRunning=true; STATE.elapsed=elapsedFromTS(); STATE.tab="workout"; startTimer(); }
+      render();
+    }
+  }, 10000);
+
   try{
     const base = _db.collection("users").doc(currentUser);
     const [wSnap,nSnap,cfSnap,ceSnap] = await Promise.all([
@@ -493,6 +504,7 @@ async function loadData(){
         try{ localStorage.setItem("ft_templates_"+currentUser, JSON.stringify(STATE.customTemplates)); }catch(e){}
       }
     }catch(e){ console.error("templates load error:",e); }
+    clearTimeout(loadTimeout);
     STATE.loading = false;
     // Migrate old root-level data to user path (runs once, no reload needed)
     migrateOldData();
@@ -505,6 +517,7 @@ async function loadData(){
     render();
   }catch(e){
     console.error("loadData error:",e);
+    clearTimeout(loadTimeout);
     STATE.loading=false; render();
   }
 }

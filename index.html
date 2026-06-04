@@ -1446,22 +1446,7 @@ function renderNutrition(){
     <span style="font-size:10px">Kahvaltı ~600 / Ara ~300 / Akşam ~1200 kcal</span>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <div style="font-size:11px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase">Plan Önerileri</div>
-    <button onclick="toggleSec('sugg')" style="background:none;border:none;color:#00BFFF;font-size:11px;font-weight:700">Göster/Gizle</button>
-  </div>
-  <div id="sugg-body">`;
-  Object.entries(MEAL_SUGG).forEach(([mt,suggs])=>{
-    const mc=MC2[mt];
-    html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:10px;padding:9px 12px;margin-bottom:7px">
-      <div style="font-size:12px;font-weight:800;color:${mc};text-transform:uppercase;margin-bottom:7px">${MI[mt]} ${mt}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">`;
-    suggs.forEach((s,i)=>{
-      const ns=s.items.map(it=>calcN(it.id,it.g)),sk=ns.reduce((a,b)=>a+b.kcal,0),sp=ns.reduce((a,b)=>a+b.protein,0);
-      html+=`<button onclick="loadSugg('${mt}',${i})" style="background:${mc}15;border:1px solid ${mc}30;border-radius:7px;padding:7px 10px;color:#E8ECF0;text-align:left"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:10px;color:#7A8898">${Math.round(sk)} kcal · ${Math.round(sp*10)/10}g P</div></button>`;
-    });
-    html+=`</div></div>`;
-  });
-  html+=`</div>`;
+    `;
   Object.entries(dayM).forEach(([mt,items])=>{
     const mc=MC2[mt],mt2=mTotals(items);
     html+=`<div style="background:#0D1117;border:1px solid ${mc}30;border-radius:12px;margin-bottom:10px;overflow:hidden">
@@ -1566,7 +1551,7 @@ function renderDrawer(){
         <button onclick="setDD({pickerTab:'custom'})" style="flex:1;background:${pickerTab==='custom'?'#00BFFF':'#1A2530'};border:none;border-radius:8px;color:${pickerTab==='custom'?'#000':'#E8ECF0'};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">+ Özel Besin</button>
       </div>
       ${pickerTab==='db'?`
-      <input id="drawer-search" class="fi" placeholder="🔍 Besin ara..." value="${q}" oninput="updateSearch(this.value)" style="margin-bottom:8px"/>
+      <input id="drawer-search" class="fi" placeholder="🔍 Besin ara..." value="${q}" onkeydown="if(event.key==='Enter')updateSearch(this.value)" oninput="STATE.drawer={...STATE.drawer,q:this.value}" style="margin-bottom:8px;flex:1"/><button onclick="updateSearch(document.getElementById('drawer-search').value)" style="background:#00BFFF;border:none;border-radius:8px;color:#000;font-size:13px;font-weight:900;padding:0 14px;margin-left:6px;margin-bottom:8px">Ara</button>
       <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px">
         ${cats.map(c=>`<button onclick="setDD({cat:'${c}'})" style="flex-shrink:0;background:${cat===c?'#00BFFF':'#1A2530'};border:none;border-radius:6px;color:${cat===c?'#000':'#A0B0C0'};font-size:10px;font-weight:700;padding:5px 10px;white-space:nowrap;text-transform:uppercase">${c}</button>`).join("")}
       </div>

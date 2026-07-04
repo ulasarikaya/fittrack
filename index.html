@@ -41,36 +41,51 @@ button{cursor:pointer}
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKOUT PLAN
 // ═══════════════════════════════════════════════════════════════════════════════
+// Isınma/Soğuma tüm günlerde sabit (Day1/2/3 aynı)
+const FIXED_WARMUP = ["5 dk yürüyüş","Tek diz göğse çekme 10 sn.","Çift diz göğse çekme 10 sn.","Abdominal Bracing 2x10 (5 sn)","Leg Glute Bridge 2x10","Cossack Squats 8 each side"];
+const FIXED_COOLDOWN = ["15 dk yürüyüş","Side Plank 3 set 30 sn.","Child Pose 10 sn.","Cat & Cow 10 sn.","Hip Flexor 8 each side","Güvercin 10 sn.","Piriformis germe 10 sn."];
+
 const WORKOUT_PLAN = {
-  "Day 1: Push":{color:"#00BFFF",muscles:["Chest","Shoulders","Triceps"],exercises:[
-    {id:"chest_press",name:"Machine Chest Press",muscle:"Chest",ds:4,dr:10},
+  "Day 1: Push":{color:"#00BFFF",muscles:["Chest","Shoulders","Triceps","Back"],exercises:[
+    {id:"single_arm_row",name:"Single Arm Cable Row",muscle:"Back",ds:4,dr:10},
     {id:"incline_press",name:"Incline Machine Press",muscle:"Chest",ds:3,dr:12},
-    {id:"pec_deck",name:"Pec Deck Fly",muscle:"Chest",ds:3,dr:15},
-    {id:"shoulder_press",name:"Machine Shoulder Press",muscle:"Shoulders",ds:4,dr:10},
+    {id:"chest_press",name:"Machine Chest Press",muscle:"Chest",ds:3,dr:10},
+    {id:"cable_fly",name:"Cable Fly",muscle:"Chest",ds:2,dr:15},
+    {id:"shoulder_press",name:"Machine Shoulder Press",muscle:"Shoulders",ds:3,dr:10},
     {id:"lateral_raise",name:"Cable Lateral Raise",muscle:"Shoulders",ds:3,dr:15},
-    {id:"tricep_pushdown",name:"Triceps Pushdown",muscle:"Triceps",ds:3,dr:12},
-    {id:"overhead_ext",name:"Overhead Triceps Extension",muscle:"Triceps",ds:3,dr:12},
+    {id:"rear_delt_machine",name:"Rear Delt Machine",muscle:"Shoulders",ds:3,dr:15},
+    {id:"rope_pushdown",name:"Rope Pushdown",muscle:"Triceps",ds:3,dr:12},
+    {id:"overhead_rope_ext",name:"Overhead Rope Extension",muscle:"Triceps",ds:2,dr:12},
   ]},
-  "Day 2: Pull":{color:"#FF6B35",muscles:["Back","Biceps","Rear Delts"],exercises:[
-    {id:"lat_pulldown",name:"Lat Pulldown",muscle:"Back",ds:4,dr:10},
-    {id:"seated_row",name:"Seated Cable Row",muscle:"Back",ds:4,dr:10},
-    {id:"chest_row",name:"Chest-Supported Row",muscle:"Back",ds:3,dr:12},
-    {id:"face_pull",name:"Face Pull",muscle:"Rear Delts",ds:3,dr:15},
-    {id:"rear_fly",name:"Rear Delt Fly Machine",muscle:"Rear Delts",ds:3,dr:15},
-    {id:"bicep_curl",name:"Machine Bicep Curl",muscle:"Biceps",ds:3,dr:12},
-    {id:"hammer_curl",name:"Dumbbell Hammer Curl",muscle:"Biceps",ds:3,dr:12},
-  ]},
-  "Day 3: Legs":{color:"#39FF14",muscles:["Quads","Hamstrings","Glutes","Calves"],exercises:[
-    {id:"leg_press",name:"Leg Press",muscle:"Quads",ds:4,dr:12},
-    {id:"hack_squat",name:"Hack Squat Machine",muscle:"Quads",ds:4,dr:10},
+  "Day 2: Lower Body":{color:"#39FF14",muscles:["Hamstrings","Quads","Glutes","Calves","Core"],exercises:[
+    {id:"seated_leg_curl",name:"Seated Leg Curl",muscle:"Hamstrings",ds:3,dr:12},
     {id:"leg_ext",name:"Leg Extension",muscle:"Quads",ds:3,dr:15},
-    {id:"leg_curl",name:"Lying Leg Curl",muscle:"Hamstrings",ds:4,dr:12},
-    {id:"hip_thrust",name:"Machine Hip Thrust",muscle:"Glutes",ds:4,dr:12},
-    {id:"calf_raise",name:"Standing Calf Raise",muscle:"Calves",ds:4,dr:15},
+    {id:"glute_machine",name:"Glute Machine",muscle:"Glutes",ds:3,dr:12},
+    {id:"calf_raise",name:"Calf Raise",muscle:"Calves",ds:4,dr:15},
+    {id:"mcgill_curlup",name:"McGill Curl Up",muscle:"Core",ds:3,dr:10},
+    {id:"farmer_carry",name:"Farmer Carry",muscle:"Core",ds:3,dr:1},
+  ]},
+  "Day 3: Pull":{color:"#FF6B35",muscles:["Back","Biceps","Rear Delts"],exercises:[
+    {id:"single_arm_row2",name:"Single Arm Cable Row",muscle:"Back",ds:4,dr:10},
+    {id:"lat_pulldown",name:"Lat Pulldown",muscle:"Back",ds:3,dr:10},
+    {id:"chest_row",name:"Chest Supported Row",muscle:"Back",ds:3,dr:12},
+    {id:"rear_delt_machine2",name:"Rear Delt Machine",muscle:"Rear Delts",ds:2,dr:15},
+    {id:"bicep_curl",name:"Machine Curl",muscle:"Biceps",ds:3,dr:12},
+    {id:"hammer_curl",name:"Hammer Curl",muscle:"Biceps",ds:3,dr:12},
   ]}
 };
 const ALL_EX = Object.values(WORKOUT_PLAN).flatMap(d=>d.exercises);
-const MC = {Chest:"#00BFFF",Shoulders:"#4FC3F7",Triceps:"#0288D1",Back:"#FF6B35",Biceps:"#FF8A65","Rear Delts":"#FF5722",Quads:"#39FF14",Hamstrings:"#69FF47",Glutes:"#00E676",Calves:"#76FF03",Core:"#FFD700",Custom:"#BB86FC"};
+const MC = {Chest:"#00BFFF",Shoulders:"#4FC3F7",Triceps:"#0288D1",Back:"#FF6B35",Biceps:"#FF8A65","Rear Delts":"#FF5722",Quads:"#39FF14",Hamstrings:"#69FF47",Glutes:"#00E676",Calves:"#76FF03",Core:"#FFD700",Custom:"#BB86FC",Cardio:"#FF9800"};
+// Hazır cardio egzersizleri - süre (dk) bazlı, ağırlık/tekrar yok
+const CARDIO_PRESETS = [
+  {id:"cardio_run",name:"Koşu",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_walk",name:"Yürüyüş",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_bike",name:"Bisiklet",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_swim",name:"Yüzme",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_elliptical",name:"Eliptik",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_rowing",name:"Kürek Makinesi",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+  {id:"cardio_stairmaster",name:"Stairmaster",muscle:"Cardio",isCardio:true,ds:1,dr:0},
+];
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FOOD DATABASE
@@ -944,8 +959,21 @@ function getPRs(history){
       if(!s) return;
       (s.sets||[]).forEach(set=>{
         if(!set||!set.exId) return;
-        const v=(set.weight||0)*(set.reps||0);
-        if(!prs[set.exId]||v>prs[set.exId].vol) prs[set.exId]={weight:set.weight||0,reps:set.reps||0,vol:v,date:s.date||""};
+        if(set.duration!==undefined){
+          // Cardio: PR = en uzun süre (dk)
+          const dur=parseFloat(set.duration)||0;
+          const cur=prs[set.exId];
+          if(!cur || dur>cur.duration){
+            prs[set.exId]={duration:dur,weight:0,reps:0,vol:dur,date:s.date||"",isCardio:true};
+          }
+          return;
+        }
+        const w=set.weight||0, r=set.reps||0;
+        const cur=prs[set.exId];
+        // PR = en yüksek AĞIRLIK (eşitlikte en yüksek tekrar kazanır)
+        if(!cur || w>cur.weight || (w===cur.weight && r>cur.reps)){
+          prs[set.exId]={weight:w,reps:r,vol:w*r,date:s.date||"",isCardio:false};
+        }
       });
     });
   }catch(e){console.error("getPRs error:",e);}
@@ -1229,11 +1257,15 @@ function renderDashboard(){
   html+=`<h2 style="font-size:13px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;margin-top:8px">Kişisel Rekorlar</h2>`;
   if(!topPRs.length) html+=`<div style="color:#556070;text-align:center;padding:20px">Henüz antrenman kaydı yok</div>`;
   topPRs.forEach((pr,i)=>{
-    const ex=ALL_EX.find(e=>e.id===pr.exId),mc=MC[ex?.muscle]||"#00BFFF";
+    const ex=ALL_EX.find(e=>e.id===pr.exId)||CARDIO_PRESETS.find(e=>e.id===pr.exId)||STATE.customExercises.find(e=>e.__id===pr.exId);
+    const mc=MC[ex?.muscle]||"#00BFFF";
+    const valueHtml = pr.isCardio
+      ? `<div style="font-size:19px;font-weight:900;color:${mc}">${pr.duration}<span style="font-size:11px"> dk</span></div>`
+      : `<div style="font-size:19px;font-weight:900;color:${mc}">${pr.weight}<span style="font-size:11px"> kg</span></div><div style="font-size:11px;color:#7A8898">× ${pr.reps}</div>`;
     html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px">
       <div style="font-size:20px;min-width:26px;text-align:center">${i===0?"🥇":i===1?"🥈":"🥉"}</div>
-      <div style="flex:1"><div style="font-size:15px;font-weight:700;text-transform:uppercase">${pr.name}</div><div style="font-size:11px;color:#7A8898">${fmtDate(pr.date)}</div></div>
-      <div style="text-align:right"><div style="font-size:19px;font-weight:900;color:${mc}">${pr.weight}<span style="font-size:11px"> kg</span></div><div style="font-size:11px;color:#7A8898">× ${pr.reps}</div></div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:700;text-transform:uppercase">${pr.isCardio?"🏃 ":""}${pr.name}</div><div style="font-size:11px;color:#7A8898">${fmtDate(pr.date)}</div></div>
+      <div style="text-align:right">${valueHtml}</div>
     </div>`;
   });
   return html+`</div>`;
@@ -1259,20 +1291,35 @@ function renderWorkout(){
   </div>
   <div style="background:#0D1117;border:1px solid #FF6B3530;border-radius:10px;margin-bottom:8px">
     <button onclick="toggleSec('warmup')" style="width:100%;background:none;border:none;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;color:#FF6B35;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px">🔥 ISINMA <span id="warmup-arr" style="color:#556070">▼</span></button>
-    <div id="warmup-body" style="display:none;padding:0 13px 11px">${["5 dk yürüyüş/bisiklet","Kol çevirmeler × 15","Kalça çevirme × 10","Bacak sallama × 10","Omuz açma × 10"].map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#FF6B35;font-size:10px">▸</span>${x}</div>`).join("")}</div>
+    <div id="warmup-body" style="display:none;padding:0 13px 11px">${FIXED_WARMUP.map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#FF6B35;font-size:10px">▸</span>${x}</div>`).join("")}</div>
   </div>`;
   aw.exercises.forEach((ex,ei)=>{
     const mc=MC[ex.muscle]||"#00BFFF",ep=prs[ex.id];
+    const isCardio = !!ex.isCardio;
+    const prBadge = ep ? (ep.isCardio ? `<div style="font-size:10px;color:#FFD700">🏆 ${ep.duration} dk</div>` : `<div style="font-size:10px;color:#FFD700">🏆 ${ep.weight}×${ep.reps}</div>`) : "";
     html+=`<div style="background:#0D1117;border:1px solid ${mc}25;border-radius:12px;margin-bottom:10px;overflow:hidden">
       <div style="padding:11px 13px;border-bottom:1px solid ${mc}20;display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-size:16px;font-weight:800;text-transform:uppercase">${ex.name}</div>
+        <div><div style="font-size:16px;font-weight:800;text-transform:uppercase">${isCardio?"🏃 ":""}${ex.name}</div>
         <span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${mc};background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></div>
         <div style="display:flex;align-items:center;gap:8px">
-          ${ep?`<div style="font-size:10px;color:#FFD700">🏆 ${ep.weight}×${ep.reps}</div>`:""}
+          ${prBadge}
           <button onclick="removeEx(${ei})" style="background:#2A1010;border:1px solid #FF444428;border-radius:6px;color:#FF6B6B;font-size:11px;padding:3px 7px;font-weight:700">✕</button>
         </div>
       </div>
       <div style="padding:7px 13px">
+        ${isCardio ? `
+        <div style="display:grid;grid-template-columns:22px 1fr 70px 28px 20px;gap:3px;margin-bottom:3px">
+          ${["SET","ÖNCEKİ","DK","",""].map(h=>`<div style="font-size:8px;color:#556070;letter-spacing:1px;text-align:center;font-weight:700">${h}</div>`).join("")}
+        </div>
+        ${ex.sets.map((set,si)=>`
+          <div class="${set.done?"sr-done":""}" style="display:grid;grid-template-columns:22px 1fr 70px 28px 20px;gap:3px;margin-bottom:3px;align-items:center;background:${set.done?"#0A2010":"transparent"};border-radius:5px;padding:1px 0">
+            <div style="font-size:12px;font-weight:800;color:${set.done?"#39FF14":"#556070"};text-align:center">${set.setNum}</div>
+            <div style="font-size:11px;color:#556070;text-align:center">${set.prevDuration?set.prevDuration+" dk":"—"}</div>
+            <input class="sr-input" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${set.duration}" oninput="updSetSilent(${ei},${si},'duration',this.value)" placeholder="0"/>
+            <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
+            <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
+          </div>`).join("")}
+        ` : `
         <div style="display:grid;grid-template-columns:22px 1fr 58px 58px 28px 20px;gap:3px;margin-bottom:3px">
           ${["SET","ÖNCEKİ","KG","TEKRAR","",""].map(h=>`<div style="font-size:8px;color:#556070;letter-spacing:1px;text-align:center;font-weight:700">${h}</div>`).join("")}
         </div>
@@ -1285,6 +1332,7 @@ function renderWorkout(){
             <button onclick="updSet(${ei},${si},'done',${!set.done})" style="background:${set.done?"#39FF14":"#1A2530"};border:1px solid ${set.done?"#39FF14":"#2A3040"};border-radius:5px;font-size:13px;height:28px;display:flex;align-items:center;justify-content:center;width:28px">${set.done?"✓":"○"}</button>
             <button onclick="delSet(${ei},${si})" style="background:none;border:none;color:#FF6B6B;font-size:13px;padding:0;height:28px;display:flex;align-items:center;justify-content:center;opacity:0.6">✕</button>
           </div>`).join("")}
+        `}
         <button onclick="addSet(${ei})" style="margin-top:5px;background:none;border:1px dashed ${mc}40;border-radius:5px;color:${mc};font-size:11px;font-weight:700;padding:5px 0;width:100%;text-transform:uppercase">+ Set Ekle</button>
       </div>
     </div>`;
@@ -1292,7 +1340,7 @@ function renderWorkout(){
   html+=`<button onclick="openExPicker()" style="width:100%;background:none;border:1px dashed #00BFFF40;border-radius:10px;color:#00BFFF;font-size:14px;font-weight:700;padding:13px;text-transform:uppercase;margin-bottom:10px">+ Egzersiz Ekle</button>
   <div style="background:#0D1117;border:1px solid #00BFFF30;border-radius:10px;margin-bottom:8px">
     <button onclick="toggleSec('cooldown')" style="width:100%;background:none;border:none;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;color:#00BFFF;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px">❄️ SOĞUMA <span id="cooldown-arr" style="color:#556070">▼</span></button>
-    <div id="cooldown-body" style="display:none;padding:0 13px 11px">${["Kedi-inek × 10","Çocuk pozu 30sn","Kalça fleksör 30sn","Piriformis 30sn","Kuş-köpek × 10","Ölü böcek × 10","Diz-göğüs 30sn"].map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#00BFFF;font-size:10px">▸</span>${x}</div>`).join("")}</div>
+    <div id="cooldown-body" style="display:none;padding:0 13px 11px">${FIXED_COOLDOWN.map(x=>`<div style="font-size:13px;color:#A0B0C0;display:flex;gap:8px;margin-bottom:4px"><span style="color:#00BFFF;font-size:10px">▸</span>${x}</div>`).join("")}</div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">
     <button onclick="discardWorkout()" style="background:#1A0808;border:1px solid #FF444440;border-radius:10px;color:#FF6B6B;font-size:15px;font-weight:800;padding:13px;text-transform:uppercase">İptal</button>
@@ -1309,7 +1357,11 @@ function renderHistory(){
   sorted.forEach(s=>{
     const color=WORKOUT_PLAN[s.day]?.color||"#00BFFF";
     const exIds=[...new Set((s.sets||[]).map(x=>x.exId))];
-    const sePRs=(s.sets||[]).filter(x=>{const pr=prs[x.exId];return pr&&pr.date===s.date&&pr.weight===x.weight&&pr.reps===x.reps;}).map(x=>x.exId);
+    const sePRs=(s.sets||[]).filter(x=>{
+      const pr=prs[x.exId]; if(!pr||pr.date!==s.date) return false;
+      if(x.duration!==undefined) return pr.isCardio && pr.duration===(parseFloat(x.duration)||0);
+      return !pr.isCardio && pr.weight===x.weight && pr.reps===x.reps;
+    }).map(x=>x.exId);
     html+=`<div style="background:#0D1117;border:1px solid ${color}25;border-radius:12px;margin-bottom:10px;padding:13px 14px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
         <div><div style="font-size:17px;font-weight:800;text-transform:uppercase;color:${color}">${s.day}</div><div style="font-size:11px;color:#7A8898">${fmtDate(s.date)}</div></div>
@@ -1401,7 +1453,7 @@ function renderProgress(){
   html+=`</div><div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Egzersiz Trendleri — ${rangeLabels[range]}</div>`;
 
   let hasAny = false;
-  [...ALL_EX,...STATE.customExercises.map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10}))].forEach(ex=>{
+  [...ALL_EX,...STATE.customExercises.filter(e=>!e.isCardio).map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10}))].forEach(ex=>{
     const trend=getTrendByRange(STATE.workoutHistory,ex.id,range),pr=prs[ex.id],mc=MC[ex.muscle]||"#BB86FC";
     if(!trend.length) return;
     hasAny = true;
@@ -1485,14 +1537,21 @@ function renderDrawer(){
         <button onclick="setDD({mode:'list'})" style="flex:1;background:${mode==="list"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="list"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Listeden Seç</button>
         <button onclick="setDD({mode:'custom'})" style="flex:1;background:${mode==="custom"?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${mode==="custom"?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:7px 0;text-transform:uppercase">Özel Ekle</button>
       </div>
-      ${mode==="list"?[...ALL_EX,...STATE.customExercises.map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10}))].map(ex=>{const mc=MC[ex.muscle]||"#BB86FC";return`<button onclick="addExercise('${ex.id}')" style="width:100%;background:#141820;border:1px solid ${mc}20;border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0"><span style="font-size:14px;font-weight:700;text-transform:uppercase">${ex.name}</span><span style="font-size:9px;color:${mc};font-weight:700;background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></button>`;}).join(""):`
+      ${mode==="list"?[...ALL_EX,...CARDIO_PRESETS,...STATE.customExercises.map(e=>({id:e.__id,name:e.name,muscle:e.muscle||"Custom",ds:e.ds||3,dr:e.dr||10,isCardio:!!e.isCardio}))].map(ex=>{const mc=MC[ex.muscle]||"#BB86FC";return`<button onclick="addExercise('${ex.id}')" style="width:100%;background:#141820;border:1px solid ${mc}20;border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;color:#E8ECF0"><span style="font-size:14px;font-weight:700;text-transform:uppercase">${ex.isCardio?"🏃 ":""}${ex.name}</span><span style="font-size:9px;color:${mc};font-weight:700;background:${mc}20;padding:2px 7px;border-radius:3px">${ex.muscle}</span></button>`;}).join(""):`
         <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:6px">
+            <button onclick="updateDrawerField('customIsCardio',false)" style="flex:1;background:${!d.customIsCardio?"#00BFFF":"#1A2530"};border:none;border-radius:8px;color:${!d.customIsCardio?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:8px 0;text-transform:uppercase">Ağırlık Egzersizi</button>
+            <button onclick="updateDrawerField('customIsCardio',true)" style="flex:1;background:${d.customIsCardio?"#FF9800":"#1A2530"};border:none;border-radius:8px;color:${d.customIsCardio?"#000":"#E8ECF0"};font-size:12px;font-weight:700;padding:8px 0;text-transform:uppercase">🏃 Cardio (Süre)</button>
+          </div>
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Egzersiz Adı</div>
-          <input id="drawer-custom-name" class="fi" placeholder="örn. Smith Machine" value="${d.customName||""}" oninput="updateDrawerField('customName',this.value)"/></div>
+          <input id="drawer-custom-name" class="fi" placeholder="${d.customIsCardio?"örn. Yüzme, Bisiklet":"örn. Smith Machine"}" value="${d.customName||""}" oninput="updateDrawerField('customName',this.value)"/></div>
+          ${d.customIsCardio?`
+          <div style="background:#0A1520;border:1px solid #FF980020;border-radius:8px;padding:8px 12px;font-size:11px;color:#7A8898">Cardio egzersizlerinde ağırlık/tekrar yerine <strong style="color:#FF9800">süre (dakika)</strong> girilir.</div>
+          `:`
           <div><div style="font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Kas Grubu</div>
           <select id="drawer-custom-muscle" onchange="updateDrawerField('customMuscle',this.value)" style="background:#1A1F28;border:1px solid #2A3040;color:#E8ECF0;border-radius:6px;padding:8px 10px;font-size:14px;font-weight:600;outline:none;width:100%">
-            ${Object.keys(MC).map(m=>`<option value="${m}" ${m===(d.customMuscle||"Custom")?"selected":""}>${m}</option>`).join("")}
-          </select></div>
+            ${Object.keys(MC).filter(m=>m!=="Cardio").map(m=>`<option value="${m}" ${m===(d.customMuscle||"Custom")?"selected":""}>${m}</option>`).join("")}
+          </select></div>`}
           <button onclick="addCustomEx()" style="background:linear-gradient(135deg,#00BFFF,#0080AA);border:none;border-radius:10px;color:#000;font-size:15px;font-weight:900;padding:11px;text-transform:uppercase">Egzersiz Ekle →</button>
         </div>`}
     </div>`;
@@ -1601,13 +1660,16 @@ function renderDrawer(){
         var ec=(STATE.customTemplates[nm]||[]).length;
         var ls=[].concat(STATE.workoutHistory).filter(function(h){return h.day===nm;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0];
         var ds=ls?" \u00b7 Son: "+fmtDate(ls.date):"";
-        th+="<button onclick=\"startCustomFromTemplate(window._cwt["+idx+"])\" style=\"width:100%;background:#141820;border:1px solid #BB86FC30;border-radius:10px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;color:#E8ECF0;text-align:left\">"
+        th+="<div style=\"display:flex;gap:6px;margin-bottom:7px\">"
+          +"<button onclick=\"startCustomFromTemplate(window._cwt["+idx+"])\" style=\"flex:1;background:#141820;border:1px solid #BB86FC30;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;color:#E8ECF0;text-align:left\">"
           +"<div>"
           +"<div style=\"font-size:15px;font-weight:800;text-transform:uppercase;color:#BB86FC\">"+nm+"</div>"
           +"<div style=\"font-size:11px;color:#7A8898\">"+ec+" egzersiz"+ds+"</div>"
           +"</div>"
           +"<div style=\"background:#BB86FC;color:#000;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:800\">BA\u015eLA \u2192</div>"
-          +"</button>";
+          +"</button>"
+          +"<button onclick=\"deleteCustomTemplate(window._cwt["+idx+"])\" style=\"background:#1A0808;border:1px solid #FF444440;border-radius:10px;color:#FF6B6B;font-size:16px;font-weight:700;padding:0 14px;flex-shrink:0\">\ud83d\uddd1</button>"
+          +"</div>";
       });
       th+="<div style=\"border-top:1px solid #1E2530;margin:12px 0\"></div>";
       th+="<div style=\"font-size:10px;color:#7A8898;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px\">YEN\u0130 ANTRENMAN OLU\u015eTUR</div>";
@@ -1746,17 +1808,23 @@ function renderLeaderboard(){
     <div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">${icon} ${title}</div>${rows}
   </div>`;
 
-  const byWeek=[...stats].sort((a,b)=>b.thisWeek-a.thisWeek);
-  const byStreak=[...stats].sort((a,b)=>b.bestStreak-a.bestStreak);
-  const byVol=[...stats].sort((a,b)=>b.totalVol-a.totalVol);
+  // Hiç antrenman yapmamış kullanıcıları sıralamalardan tamamen çıkar
+  const activeStats = stats.filter(u=>u.totalWorkouts>0);
 
-  const allExIds=[...new Set(stats.flatMap(u=>u.topPRs.map(p=>p.exId)))].slice(0,5);
+  const byWeek=[...activeStats].filter(u=>u.thisWeek>0).sort((a,b)=>b.thisWeek-a.thisWeek);
+  const byStreak=[...activeStats].filter(u=>u.bestStreak>0).sort((a,b)=>b.bestStreak-a.bestStreak);
+  const byVol=[...activeStats].filter(u=>u.totalVol>0).sort((a,b)=>b.totalVol-a.totalVol);
+
+  const allExIds=[...new Set(activeStats.flatMap(u=>u.topPRs.map(p=>p.exId)))].slice(0,5);
   const prSection = allExIds.length===0
     ? '<div style="color:#556070;text-align:center;padding:16px;font-size:13px">Henüz PR verisi yok</div>'
     : allExIds.map(exId=>{
         const ex=ALL_EX.find(e=>e.id===exId);
         const mc=MC[ex?.muscle]||"#00BFFF";
-        const userPRs=stats.map(u=>{const prs=getPRs(u.workoutHistory||[]);return{...u,pr:prs[exId]||null};}).filter(u=>u.pr).sort((a,b)=>b.pr.vol-a.pr.vol);
+        const userPRs=activeStats.map(u=>{const prs=getPRs(u.workoutHistory||[]);return{...u,pr:prs[exId]||null};}).filter(u=>u.pr).sort((a,b)=>{
+          if(a.pr.isCardio) return b.pr.duration-a.pr.duration;
+          return b.pr.weight-a.pr.weight||b.pr.reps-a.pr.reps;
+        });
         if(!userPRs.length) return "";
         return`<div style="margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
@@ -1766,7 +1834,7 @@ function renderLeaderboard(){
           ${userPRs.map((u,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1A2530">
             <span style="font-size:14px;width:24px;text-align:center">${M[i]||""}</span>
             <span style="flex:1;font-size:13px;font-weight:${u.isSelf?800:500};color:${u.isSelf?"#00BFFF":"#E8ECF0"};text-transform:uppercase">${u.displayName}${u.isSelf?" ✦":""}</span>
-            <span style="font-size:13px;font-weight:900;color:${u.isSelf?"#00BFFF":"#E8ECF0"}">${u.pr.weight}kg <span style="color:#556070;font-weight:400">×${u.pr.reps}</span></span>
+            <span style="font-size:13px;font-weight:900;color:${u.isSelf?"#00BFFF":"#E8ECF0"}">${u.pr.isCardio ? u.pr.duration+" dk" : u.pr.weight+"kg <span style=\"color:#556070;font-weight:400\">×"+u.pr.reps+"</span>"}</span>
           </div>`).join("")}
         </div>`;
       }).join("");
@@ -1776,9 +1844,9 @@ function renderLeaderboard(){
       <h1 style="font-size:26px;font-weight:900;letter-spacing:1px;text-transform:uppercase"><span style="color:#FFD700">Liderlik</span> Tablosu</h1>
       <button onclick="LEADERBOARD_DATA={};loadLeaderboardData()" style="background:#1A1F28;border:1px solid #2A3040;border-radius:8px;color:#7A8898;font-size:11px;font-weight:700;padding:6px 12px;text-transform:uppercase">🔄</button>
     </div>
-    ${section("Bu Hafta","📅",byWeek.map((u,i)=>row(M[i]||"",u.displayName,u.thisWeek,"seans",u.isSelf)).join(""))}
-    ${section("Seri Rekoru","🔥",byStreak.map((u,i)=>row(M[i]||"",u.displayName,u.bestStreak,"hafta",u.isSelf)).join(""))}
-    ${section("Toplam Hacim","⚡",byVol.map((u,i)=>row(M[i]||"",u.displayName,u.totalVol.toLocaleString(),"kg·tekr",u.isSelf)).join(""))}
+    ${section("Bu Hafta","📅",byWeek.length?byWeek.map((u,i)=>row(M[i]||"",u.displayName,u.thisWeek,"seans",u.isSelf)).join(""):'<div style="color:#556070;text-align:center;padding:12px;font-size:13px">Bu hafta kimse antrenman yapmadı</div>')}
+    ${section("Seri Rekoru","🔥",byStreak.length?byStreak.map((u,i)=>row(M[i]||"",u.displayName,u.bestStreak,"hafta",u.isSelf)).join(""):'<div style="color:#556070;text-align:center;padding:12px;font-size:13px">Henüz seri yok</div>')}
+    ${section("Toplam Hacim","⚡",byVol.length?byVol.map((u,i)=>row(M[i]||"",u.displayName,u.totalVol.toLocaleString(),"kg·tekr",u.isSelf)).join(""):'<div style="color:#556070;text-align:center;padding:12px;font-size:13px">Henüz hacim verisi yok</div>')}
     <div style="background:#0D1117;border:1px solid #1E2530;border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:#7A8898;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">💪 PR KARŞILAŞTIRMASI</div>
       ${prSection}
@@ -1810,6 +1878,22 @@ function startCustomWorkout(){
   render();
 }
 
+async function deleteCustomTemplate(name){
+  if(!confirm('"'+name+'" antrenmanını silmek istediğine emin misin? (Geçmiş antrenman kayıtların silinmez, sadece şablon kaldırılır)')) return;
+  const updated = {...STATE.customTemplates};
+  delete updated[name];
+  STATE.customTemplates = updated;
+  try{ localStorage.setItem("ft_templates_"+currentUser, JSON.stringify(STATE.customTemplates)); }catch(e){}
+  render();
+  try{
+    await _db.collection("users").doc(currentUser).collection("custom_templates").doc(name).delete();
+    showToast("✓ Antrenman silindi");
+  }catch(e){
+    console.error("template delete error:",e);
+    showToast("⚠️ Silme hatası!");
+  }
+}
+
 function startCustomFromTemplate(name){
   STATE.drawer = null;
   const tmplExercises = STATE.customTemplates[name] || [];
@@ -1818,6 +1902,18 @@ function startCustomFromTemplate(name){
     const lastW_hist = [...STATE.workoutHistory].reverse()
       .find(h=>h.day===name && (h.sets||[]).some(s=>s.exId===ex.id));
     const ls = lastW_hist ? (lastW_hist.sets||[]).filter(s=>s.exId===ex.id) : [];
+    if(ex.isCardio){
+      const lastDur = ls.length>0 ? ls[ls.length-1].duration : null;
+      return {
+        ...ex,
+        sets: Array.from({length:ex.ds||1}, (_,i) => ({
+          setNum: i+1,
+          duration: String(ls[i]?.duration ?? lastDur ?? ""),
+          done: false,
+          prevDuration: ls[i]?.duration ?? lastDur ?? null,
+        }))
+      };
+    }
     const lastW = ls.length>0 ? ls[ls.length-1].weight : null;
     const lastR = ls.length>0 ? ls[ls.length-1].reps : null;
     return {
@@ -1888,7 +1984,10 @@ function updSetSilent(ei,si,field,rawVal){
 function addSet(ei){
   const aw=STATE.activeWorkout; if(!aw) return;
   const ex=[...aw.exercises],last=ex[ei].sets[ex[ei].sets.length-1];
-  ex[ei]={...ex[ei],sets:[...ex[ei].sets,{setNum:ex[ei].sets.length+1,weight:last?.weight||"",reps:last?.reps||10,done:false,prevW:null,prevR:null}]};
+  const newSet = ex[ei].isCardio
+    ? {setNum:ex[ei].sets.length+1,duration:last?.duration||"",done:false,prevDuration:null}
+    : {setNum:ex[ei].sets.length+1,weight:last?.weight||"",reps:last?.reps||10,done:false,prevW:null,prevR:null};
+  ex[ei]={...ex[ei],sets:[...ex[ei].sets,newSet]};
   STATE.activeWorkout={...aw,exercises:ex}; saveAW(STATE.activeWorkout); render();
 }
 function delSet(ei,si){
@@ -1904,44 +2003,59 @@ function removeEx(ei){
   STATE.activeWorkout={...aw,exercises:aw.exercises.filter((_,i)=>i!==ei)};
   saveAW(STATE.activeWorkout); render();
 }
-function openExPicker(){ STATE.drawer={type:"exPicker",mode:"list",customName:"",customMuscle:"Custom"}; render(); }
+function openExPicker(){ STATE.drawer={type:"exPicker",mode:"list",customName:"",customMuscle:"Custom",customIsCardio:false}; render(); }
 function addExercise(exId){
   let ex=ALL_EX.find(e=>e.id===exId);
+  if(!ex) ex=CARDIO_PRESETS.find(e=>e.id===exId);
   if(!ex){
     const ce=STATE.customExercises.find(e=>e.__id===exId);
-    if(ce) ex={id:ce.__id,name:ce.name,muscle:ce.muscle||"Custom",ds:ce.ds||3,dr:ce.dr||10};
+    if(ce) ex={id:ce.__id,name:ce.name,muscle:ce.muscle||"Custom",ds:ce.ds||3,dr:ce.dr||10,isCardio:!!ce.isCardio};
   }
   if(!ex||!STATE.activeWorkout) return;
-  // Auto-fill from last workout
   const last=[...STATE.workoutHistory].reverse().find(h=>h.day===STATE.activeWorkout.dayName);
   const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
-  const lastW=ls.length>0?ls[ls.length-1].weight:null;
-  const lastR=ls.length>0?ls[ls.length-1].reps:null;
-  const sets=Array.from({length:ex.ds||3},(_,i)=>({
-    setNum:i+1,
-    weight:String(ls[i]?.weight??lastW??""),
-    reps:ls[i]?.reps??lastR??ex.dr??10,
-    done:false,
-    prevW:ls[i]?.weight??lastW??null,
-    prevR:ls[i]?.reps??lastR??null,
-  }));
+  let sets;
+  if(ex.isCardio){
+    const lastDur = ls.length>0 ? ls[ls.length-1].duration : null;
+    sets = Array.from({length:ex.ds||1},(_,i)=>({
+      setNum:i+1,
+      duration:String(ls[i]?.duration??lastDur??""),
+      done:false,
+      prevDuration:ls[i]?.duration??lastDur??null,
+    }));
+  } else {
+    const lastW=ls.length>0?ls[ls.length-1].weight:null;
+    const lastR=ls.length>0?ls[ls.length-1].reps:null;
+    sets=Array.from({length:ex.ds||3},(_,i)=>({
+      setNum:i+1,
+      weight:String(ls[i]?.weight??lastW??""),
+      reps:ls[i]?.reps??lastR??ex.dr??10,
+      done:false,
+      prevW:ls[i]?.weight??lastW??null,
+      prevR:ls[i]?.reps??lastR??null,
+    }));
+  }
   STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets}]};
   saveAW(STATE.activeWorkout); STATE.drawer=null; render();
 }
 async function addCustomEx(){
   const d=STATE.drawer; if(!d||!d.customName?.trim()||!STATE.activeWorkout) return;
-  const exData={name:d.customName.trim(),muscle:d.customMuscle||"Custom",ds:3,dr:10};
-  // Save to Firebase so it persists
+  const isCardio = !!d.customIsCardio;
+  const exData = isCardio
+    ? {name:d.customName.trim(),muscle:"Cardio",isCardio:true,ds:1,dr:0}
+    : {name:d.customName.trim(),muscle:d.customMuscle||"Custom",isCardio:false,ds:3,dr:10};
+  const initialSet = isCardio
+    ? {setNum:1,duration:"",done:false,prevDuration:null}
+    : {setNum:1,weight:"",reps:exData.dr,done:false,prevW:null,prevR:null};
   try{
     const ref = await _db.collection("users").doc(currentUser).collection("custom_exercises").add(exData);
     const saved={__id:ref.id,...exData};
     STATE.customExercises=[...STATE.customExercises, saved];
     const ex={id:ref.id,...exData};
-    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[initialSet]}]};
   }catch(e){
-    // fallback if offline
     const ex={id:"c"+Date.now(),...exData};
-    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[{setNum:1,weight:"",reps:ex.dr,done:false,prevW:null,prevR:null}]}]};
+    STATE.activeWorkout={...STATE.activeWorkout,exercises:[...STATE.activeWorkout.exercises,{...ex,sets:[initialSet]}]};
   }
   saveAW(STATE.activeWorkout); STATE.drawer=null; render();
 }
@@ -1969,11 +2083,17 @@ function closeDrawer(){ STATE.drawer=null; render(); }
 async function finishWorkout(){
   const aw=STATE.activeWorkout; if(!aw) return;
   const allSets=[];
-  aw.exercises.forEach(ex=>ex.sets.filter(s=>s.done).forEach(s=>allSets.push({exId:ex.id,weight:parseFloat(s.weight)||0,reps:parseInt(s.reps)||0})));
+  aw.exercises.forEach(ex=>ex.sets.filter(s=>s.done).forEach(s=>{
+    if(ex.isCardio){
+      allSets.push({exId:ex.id, duration:parseFloat(String(s.duration).replace(",","."))||0});
+    } else {
+      allSets.push({exId:ex.id, weight:parseFloat(String(s.weight).replace(",","."))||0, reps:parseInt(s.reps)||0});
+    }
+  }));
   const entry={day:aw.dayName,date:aw.startDate,duration:Math.round(STATE.elapsed/60),sets:allSets};
   // Save custom workout template per name
   if(aw.isCustom){
-    const tmplExercises = aw.exercises.map(ex=>({id:ex.id,name:ex.name,muscle:ex.muscle,ds:ex.ds||3,dr:ex.dr||10}));
+    const tmplExercises = aw.exercises.map(ex=>({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:!!ex.isCardio,ds:ex.ds||3,dr:ex.dr||10}));
     const tmplKey = aw.dayName;
     STATE.customTemplates = {...STATE.customTemplates, [tmplKey]: tmplExercises};
     // Save to localStorage immediately (reliable)

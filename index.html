@@ -66,10 +66,10 @@ const WORKOUT_PLAN = {
     {id:"farmer_carry",name:"Farmer Carry",muscle:"Core",ds:3,dr:1},
   ]},
   "Day 3: Pull":{color:"#FF6B35",muscles:["Back","Biceps","Rear Delts"],exercises:[
-    {id:"single_arm_row2",name:"Single Arm Cable Row",muscle:"Back",ds:4,dr:10},
+    {id:"single_arm_row",name:"Single Arm Cable Row",muscle:"Back",ds:4,dr:10},
     {id:"lat_pulldown",name:"Lat Pulldown",muscle:"Back",ds:3,dr:10},
     {id:"chest_row",name:"Chest Supported Row",muscle:"Back",ds:3,dr:12},
-    {id:"rear_delt_machine2",name:"Rear Delt Machine",muscle:"Rear Delts",ds:2,dr:15},
+    {id:"rear_delt_machine",name:"Rear Delt Machine",muscle:"Rear Delts",ds:2,dr:15},
     {id:"bicep_curl",name:"Machine Curl",muscle:"Biceps",ds:3,dr:12},
     {id:"hammer_curl",name:"Hammer Curl",muscle:"Biceps",ds:3,dr:12},
   ]}
@@ -1897,11 +1897,9 @@ async function deleteCustomTemplate(name){
 function startCustomFromTemplate(name){
   STATE.drawer = null;
   const tmplExercises = STATE.customTemplates[name] || [];
-  // Auto-fill from last workout with this name
+  // Her egzersizin en son yapıldığı seansı (hangi antrenman olursa olsun) bul
   const exercises = tmplExercises.map(ex => {
-    const lastW_hist = [...STATE.workoutHistory].reverse()
-      .find(h=>h.day===name && (h.sets||[]).some(s=>s.exId===ex.id));
-    const ls = lastW_hist ? (lastW_hist.sets||[]).filter(s=>s.exId===ex.id) : [];
+    const ls = getLastSetsForExercise(ex.id);
     if(ex.isCardio){
       const lastDur = ls.length>0 ? ls[ls.length-1].duration : null;
       return {
@@ -1941,11 +1939,22 @@ function confirmCustomWorkoutName(){
   startCustomFromTemplate(name);
 }
 
+// Bir egzersizin (hangi gün/antrenman olursa olsun) EN SON yapıldığı setleri bulur.
+// Gün adına bakmaz - sadece egzersiz ID'sine göre tüm geçmişi tarar.
+function getLastSetsForExercise(exId){
+  if(!exId) return [];
+  const sorted=[...STATE.workoutHistory].filter(h=>h&&h.date).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  for(const h of sorted){
+    const sets=(h.sets||[]).filter(s=>s&&s.exId===exId);
+    if(sets.length) return sets;
+  }
+  return [];
+}
+
 function startWorkout(dayName){
   const plan=WORKOUT_PLAN[dayName];
-  const last=[...STATE.workoutHistory].reverse().find(h=>h.day===dayName);
   const exercises=plan.exercises.map(ex=>{
-    const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
+    const ls=getLastSetsForExercise(ex.id);
     // Önceki setin ağırlığını al; index yoksa son setin ağırlığını fallback olarak kullan
     const lastW = ls.length>0 ? ls[ls.length-1].weight : null;
     const lastR = ls.length>0 ? ls[ls.length-1].reps   : null;
@@ -2012,8 +2021,7 @@ function addExercise(exId){
     if(ce) ex={id:ce.__id,name:ce.name,muscle:ce.muscle||"Custom",ds:ce.ds||3,dr:ce.dr||10,isCardio:!!ce.isCardio};
   }
   if(!ex||!STATE.activeWorkout) return;
-  const last=[...STATE.workoutHistory].reverse().find(h=>h.day===STATE.activeWorkout.dayName);
-  const ls=last?(last.sets||[]).filter(s=>s.exId===ex.id):[];
+  const ls=getLastSetsForExercise(ex.id);
   let sets;
   if(ex.isCardio){
     const lastDur = ls.length>0 ? ls[ls.length-1].duration : null;

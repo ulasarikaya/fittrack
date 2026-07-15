@@ -629,6 +629,8 @@ async function loadData(){
     STATE.loading = false;
     // Migrate old root-level data to user path (runs once, no reload needed)
     migrateOldData();
+    // Eski, yanlışlıkla ikiye ayrılmış egzersiz ID'lerini birleştir (bir kere çalışır)
+    migrateLegacyExerciseIds();
     const savedAW = loadAW();
     if(savedAW){
       STATE.activeWorkout=savedAW; STATE.workoutRunning=true;
@@ -641,6 +643,44 @@ async function loadData(){
     clearTimeout(loadTimeout);
     STATE.loading=false; render();
   }
+}
+
+// Eskiden yanlışlıkla farklı ID verilmiş ama aslında aynı egzersiz olan hareketler
+// (örn: "Single Arm Cable Row" hem "single_arm_row" hem "single_arm_row2" olarak kaydedilmişti)
+const LEGACY_EXERCISE_ID_MAP = {
+  "single_arm_row2": "single_arm_row",
+  "rear_delt_machine2": "rear_delt_machine",
+};
+
+async function migrateLegacyExerciseIds(){
+  const FLAG_KEY = "ft_legacyid_migrated_v1_"+currentUser;
+  if(localStorage.getItem(FLAG_KEY)) return;
+  localStorage.setItem(FLAG_KEY, "1"); // tekrar çalışmasın diye hemen işaretle
+  try{
+    let changedAny = false;
+    for(const h of STATE.workoutHistory){
+      if(!h || !h.__id || !Array.isArray(h.sets)) continue;
+      let changed = false;
+      const newSets = h.sets.map(s=>{
+        if(s && LEGACY_EXERCISE_ID_MAP[s.exId]){
+          changed = true;
+          return {...s, exId: LEGACY_EXERCISE_ID_MAP[s.exId]};
+        }
+        return s;
+      });
+      if(changed){
+        h.sets = newSets; // hafızada anında güncelle
+        changedAny = true;
+        try{
+          await _db.collection("users").doc(currentUser).collection("workouts").doc(h.__id).update({sets:newSets});
+        }catch(e){ console.error("legacy id migrate write error:",e); }
+      }
+    }
+    if(changedAny){
+      showToast("✓ Egzersiz kayıtları birleştirildi");
+      render();
+    }
+  }catch(e){ console.error("migrateLegacyExerciseIds error:",e); }
 }
 
 async function migrateOldData(){
